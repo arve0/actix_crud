@@ -9,12 +9,12 @@ This project illustrates two examples:
        collecting the results and returning them as a single serialized json object
  */
 use actix_web::{middleware, web, App, Error as AWError, HttpResponse, HttpServer};
-use futures::future::{join_all, ok as fut_ok, Future};
+use futures::future::{join_all, Future};
 use r2d2_sqlite;
 use r2d2_sqlite::SqliteConnectionManager;
-use rusqlite::{NO_PARAMS, Row};
+use rusqlite::{NO_PARAMS};
 use failure::{err_msg, Error};
-use serde_derive::{Deserialize, Serialize};
+// use serde_derive::{Deserialize, Serialize};
 
 mod db;
 use db::{Pool, Connection, Queries};
@@ -35,7 +35,7 @@ fn main() -> Result<(), Error> {
         App::new()
             .data(pool.clone())
             .wrap(middleware::Logger::default())
-            .service(web::resource("/get").route(web::get().to_async(get_entries)))
+            // .service(web::resource("/get").route(web::get().to_async(get_entries)))
             .service(
                 web::resource("/parallel_weather").route(web::get().to_async(parallel_weather)),
             )
@@ -66,50 +66,50 @@ fn setup_db(connection: Connection) -> Result<(), Error> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct DBEntry {
-    id: u64,
-    revision: u64,
-    hash: Vec<u8>,
-    prev_hash: Vec<u8>,
-    json: String,
-}
+// #[derive(Debug, Serialize, Deserialize)]
+// struct DBEntry {
+//     id: u64,
+//     revision: u64,
+//     hash: Vec<u8>,
+//     prev_hash: Vec<u8>,
+//     json: String,
+// }
 
-fn get_entries(db: web::Data<Pool>) -> impl Future<Item = HttpResponse, Error = AWError> {
-    execute(&db)
-        .map_err(AWError::from)
-        .and_then(|result| HttpResponse::Ok().json(result))
-}
+// fn get_entries(db: web::Data<Pool>) -> impl Future<Item = HttpResponse, Error = AWError> {
+//     execute(&db)
+//         .map_err(AWError::from)
+//         .and_then(|result| HttpResponse::Ok().json(result))
+// }
 
-/// Version 1: Calls 4 queries in sequential order, as an asynchronous handler
-fn execute(pool: &Pool) -> impl Future<Item = Vec<DBEntry>, Error = AWError> {
-    // TODO: use sqlite WAL and only block on writes
-    let pool = pool.clone();
-    web::block(move || {
-        fut_ok(
-            really_get(
-                pool.get()?
-            )?
-        )
-    }).from_err()
-}
+// /// Version 1: Calls 4 queries in sequential order, as an asynchronous handler
+// fn execute(pool: &Pool) -> impl Future<Item = Vec<DBEntry>, Error = AWError> {
+//     // TODO: use sqlite WAL and only block on writes
+//     let pool = pool.clone();
+//     web::block(move || {
+//         fut_ok(
+//             really_get(
+//                 pool.get()?
+//             )?
+//         )
+//     }).from_err()
+// }
 
-fn really_get(connection: Connection) -> Result<Vec<DBEntry>, AWError> {
-    connection.prepare(include_str!("get_db_entries.sql"))?
-        .query_map(NO_PARAMS, into_db_entry)
-        .map_err(Error::from)
-        .and_then(Iterator::collect)
-}
+// fn really_get(connection: Connection) -> Result<Vec<DBEntry>, AWError> {
+//     connection.prepare(include_str!("get_db_entries.sql"))?
+//         .query_map(NO_PARAMS, into_db_entry)
+//         .map_err(Error::from)
+//         .and_then(Iterator::collect)
+// }
 
-fn into_db_entry(row: &Row) -> DBEntry {
-    DBEntry {
-        id: row.get(0),
-        revision: 0,
-        hash: vec![],
-        prev_hash: vec![],
-        json: String::new(),
-    }
-}
+// fn into_db_entry(row: &Row) -> DBEntry {
+//     DBEntry {
+//         id: row.get(0),
+//         revision: 0,
+//         hash: vec![],
+//         prev_hash: vec![],
+//         json: String::new(),
+//     }
+// }
 
 /// Version 2: Calls 4 queries in parallel, as an asynchronous handler
 /// Returning Error types turn into None values in the response
