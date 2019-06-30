@@ -1,8 +1,8 @@
 use actix_web::{middleware, web, App, HttpResponse, HttpServer, ResponseError};
 use r2d2_sqlite;
 use r2d2_sqlite::SqliteConnectionManager;
-use rusqlite::types::{FromSql, ToSql, FromSqlError, ToSqlOutput, FromSqlResult, ValueRef,};
-use rusqlite::{Connection, Error as SqliteError, Row, NO_PARAMS, named_params};
+use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
+use rusqlite::{named_params, Connection, Error as SqliteError, Row, NO_PARAMS};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 use std::path::Path;
@@ -17,10 +17,12 @@ fn main() -> Result<(), failure::Error> {
         App::new()
             .data(get_db_pool())
             .wrap(middleware::Logger::default())
-            .service(web::resource("/{id}").route(web::get().to(get)))
+            .service(
+                web::resource("/{id}")
+                    .route(web::get().to(get))
+                    .route(web::delete().to(delete)),
+            )
             .service(web::resource("/").route(web::put().to(put)))
-        // .service(put)
-        // .service(delete)
     })
     .bind("127.0.0.1:8080")?;
 
@@ -68,9 +70,10 @@ fn put(entry: web::Json<DBEntry>, pool: web::Data<Pool>) -> Result<HttpResponse,
     let count: i64 = count_by_id.query_row(&[&entry.id], |row| row.get(0))?;
 
     if count == 0 {
-        let mut insert = db.prepare_cached(include_str!("db/insert.sql"))
-        .expect("Unable to parse db/insert.sql");
-        let number_of_rows = insert.execute_named(named_params!{
+        let mut insert = db
+            .prepare_cached(include_str!("db/insert.sql"))
+            .expect("Unable to parse db/insert.sql");
+        let number_of_rows = insert.execute_named(named_params! {
             ":id": entry.id,
             ":revision": entry.revision,
             ":hash": entry.hash,
@@ -79,10 +82,28 @@ fn put(entry: web::Json<DBEntry>, pool: web::Data<Pool>) -> Result<HttpResponse,
         })?;
         assert!(number_of_rows == 1);
     } else {
-        return Ok(HttpResponse::Conflict().body(r#"{"ok":false,"error":"Existing document with same id exists"}"#));
+        return Ok(HttpResponse::Conflict()
+            .body(r#"{"ok":false,"error":"Existing document with same id exists"}"#));
     }
 
     Ok(HttpResponse::Created().body(r#"{"ok":true}"#))
+}
+
+fn delete(id: web::Path<String>, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
+    let db = pool.get()?;
+    let mut delete_by_id = db
+        .prepare_cached(include_str!("db/delete_by_id.sql"))
+        .expect("Unable to parse db/delete_by_id.sql");
+
+    let affected_rows = delete_by_id.execute(&[id.into_inner()])?;
+
+    if affected_rows == 1 {
+        Ok(HttpResponse::Ok().body(r#"{"ok":true}"#))
+    } else if affected_rows == 0 {
+        return Ok(HttpResponse::NotFound().body(r#"{"ok":false,"error":"Document not found"}"#));
+    } else {
+        panic!("Removed more then 1 row")
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -110,15 +131,18 @@ impl DBEntry {
 enum Error {
     Pool(r2d2::Error),
     Sqlite(SqliteError),
-    ToSql,
 }
 
 impl std::error::Error for Error {
     fn description(&self) -> &str {
         "asdf"
     }
-    fn cause(&self) -> Option<&dyn std::error::Error> { None }
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> { None }
+    fn cause(&self) -> Option<&dyn std::error::Error> {
+        None
+    }
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
+    }
 }
 
 impl From<r2d2::Error> for Error {
@@ -139,7 +163,6 @@ impl std::fmt::Display for Error {
         match self {
             Pool(error) => error.fmt(f),
             Sqlite(error) => error.fmt(f),
-            ToSql => writeln!(f, "Unable to convert data to string"),
         }
     }
 }
@@ -161,7 +184,8 @@ impl FromSql for JSON {
     fn column_result(value: ValueRef) -> FromSqlResult<Self> {
         match value {
             ValueRef::Text(text) => {
-                let value = RawValue::from_string(text.to_string()).expect("Got invalid JSON from database");
+                let value = RawValue::from_string(text.to_string())
+                    .expect("Got invalid JSON from database");
                 Ok(JSON(value))
             }
             _ => Err(FromSqlError::InvalidType),

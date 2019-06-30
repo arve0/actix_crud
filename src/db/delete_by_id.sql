@@ -1,0 +1,1 @@
+delete from entries where id=?1;
