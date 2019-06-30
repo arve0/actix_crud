@@ -1,6 +1,7 @@
 use actix_web::{middleware, web, App, HttpResponse, HttpServer, ResponseError};
 use r2d2_sqlite;
 use r2d2_sqlite::SqliteConnectionManager;
+use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ValueRef};
 use rusqlite::{Connection, Error as SqliteError, Row, NO_PARAMS};
 use serde_derive::{Deserialize, Serialize};
 use std::path::Path;
@@ -63,7 +64,7 @@ struct DBEntry {
     revision: i64,
     hash: Vec<u8>,
     prev_hash: Option<Vec<u8>>,
-    data: Vec<u8>,
+    data: JSON,
 }
 
 impl DBEntry {
@@ -112,6 +113,22 @@ impl ResponseError for Error {
         match self {
             Sqlite(rusqlite::Error::QueryReturnedNoRows) => HttpResponse::NotFound().finish(),
             _ => HttpResponse::InternalServerError().finish(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct JSON(serde_json::Value);
+
+impl FromSql for JSON {
+    fn column_result(value: ValueRef) -> FromSqlResult<Self> {
+        match value {
+            ValueRef::Text(text) => {
+                let parsed = serde_json::from_str(text)
+                    .map_err(|error| FromSqlError::Other(Box::new(error)))?;
+                Ok(JSON(parsed))
+            }
+            _ => Err(FromSqlError::InvalidType),
         }
     }
 }
