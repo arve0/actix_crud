@@ -22,7 +22,10 @@ fn main() -> Result<(), failure::Error> {
                     .route(web::get().to(get))
                     .route(web::delete().to(delete)),
             )
-            .service(web::resource("/").route(web::put().to(put)))
+            .service(web::resource("/")
+            .route(web::post().to(insert))
+            .route(web::put().to(update))
+            )
     })
     .bind("127.0.0.1:8080")?;
 
@@ -71,7 +74,7 @@ fn get(id: web::Path<String>, pool: web::Data<Pool>) -> Result<HttpResponse, Err
     Ok(HttpResponse::Ok().json(result))
 }
 
-fn put(entry: web::Json<DBEntry>, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
+fn insert(entry: web::Json<DBEntry>, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
     let mut count_by_id = db
         .prepare_cached(include_str!("db/count_by_id.sql"))
@@ -94,6 +97,33 @@ fn put(entry: web::Json<DBEntry>, pool: web::Data<Pool>) -> Result<HttpResponse,
     } else {
         return Ok(HttpResponse::Conflict()
             .body(r#"{"ok":false,"error":"Existing document with same id exists"}"#));
+    }
+
+    Ok(HttpResponse::Created().body(r#"{"ok":true}"#))
+}
+
+fn update(entry: web::Json<DBEntry>, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
+    let db = pool.get()?;
+    let mut count_by_id = db
+        .prepare_cached(include_str!("db/count_by_id.sql"))
+        .expect("Unable to parse db/count_by_id.sql");
+
+    let count: i64 = count_by_id.query_row(&[&entry.id], |row| row.get(0))?;
+
+    if count == 1 {
+        let mut update = db
+            .prepare_cached(include_str!("db/update.sql"))
+            .expect("Unable to parse db/update.sql");
+        let number_of_rows = update.execute_named(named_params! {
+            ":id": entry.id,
+            ":revision": entry.revision,
+            ":hash": entry.hash,
+            ":prev_hash": entry.prev_hash,
+            ":data": entry.data,
+        })?;
+        assert!(number_of_rows == 1);
+    } else {
+        return insert(entry, pool);
     }
 
     Ok(HttpResponse::Created().body(r#"{"ok":true}"#))
