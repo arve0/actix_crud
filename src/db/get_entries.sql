@@ -3,5 +3,6 @@ select
     ,revision
     ,hash
     ,prev_hash
-    ,json
-    from sakkosekk;
+    ,data
+from entries
+;
