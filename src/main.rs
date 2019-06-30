@@ -44,10 +44,20 @@ fn get_db_create_if_missing() -> SqliteConnectionManager {
 }
 
 fn create_db() {
-    Connection::open(DB_FILENAME)
-        .expect("Unable to open database.")
-        .execute(include_str!("db/schema.sql"), NO_PARAMS)
+    let db = Connection::open(DB_FILENAME).expect("Unable to open database.");
+
+    db.execute(include_str!("db/schema.sql"), NO_PARAMS)
         .expect("Unable to create table in database.");
+
+    enable_write_ahead_logging(&db);
+}
+
+fn enable_write_ahead_logging(db: &Connection) {
+    // PRAGMA journal_mode=wal;
+    let result: String = db
+        .pragma_update_and_check(None, "journal_mode", &"wal", |row| row.get(0))
+        .unwrap();
+    assert!("wal" == &result);
 }
 
 fn get(id: web::Path<String>, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
