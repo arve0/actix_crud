@@ -1,0 +1,1 @@
+select count(*) from entries where id=?1;
