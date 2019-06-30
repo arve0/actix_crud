@@ -5,9 +5,6 @@ use rusqlite::{Connection, Error as SqliteError, Row, NO_PARAMS};
 use serde_derive::{Deserialize, Serialize};
 use std::path::Path;
 
-// mod db;
-// use db::{Pool, Connection, Queries};
-
 type Pool = r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>;
 
 fn main() -> Result<(), failure::Error> {
@@ -55,8 +52,7 @@ fn get(id: web::Path<String>, pool: web::Data<Pool>) -> Result<HttpResponse, Err
         .prepare_cached(include_str!("db/get_entry_by_id.sql"))
         .expect("Unable to parse db/get_entry_by_id.sql");
 
-    let result = get_by_id
-        .query_row(&[id.into_inner()], DBEntry::from_row)?;
+    let result = get_by_id.query_row(&[id.into_inner()], DBEntry::from_row)?;
 
     Ok(HttpResponse::Ok().json(result))
 }
