@@ -10,7 +10,7 @@ use std::path::Path;
 type Pool = r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>;
 
 fn main() -> Result<(), failure::Error> {
-    std::env::set_var("RUST_LOG", "actix_web=info");
+    // enable logging with RUST_LOG=info
     env_logger::init();
 
     let server = HttpServer::new(move || {
