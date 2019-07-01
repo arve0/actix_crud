@@ -68,6 +68,7 @@ fn get(id: web::Path<String>, pool: web::Data<Pool>) -> Result<HttpResponse, Err
     let mut get_by_id = db
         .prepare_cached(include_str!("db/get_entry_by_id.sql"))
         .expect("Unable to parse db/get_entry_by_id.sql");
+        // TODO: log error + 500 response
 
     let result = get_by_id.query_row(&[id.into_inner()], DBEntry::from_row)?;
 
@@ -88,9 +89,6 @@ fn insert(entry: web::Json<DBEntry>, pool: web::Data<Pool>) -> Result<HttpRespon
             .expect("Unable to parse db/insert.sql");
         let number_of_rows = insert.execute_named(named_params! {
             ":id": entry.id,
-            ":revision": entry.revision,
-            ":hash": entry.hash,
-            ":prev_hash": entry.prev_hash,
             ":data": entry.data,
         })?;
         assert!(number_of_rows == 1);
@@ -116,9 +114,6 @@ fn update(entry: web::Json<DBEntry>, pool: web::Data<Pool>) -> Result<HttpRespon
             .expect("Unable to parse db/update.sql");
         let number_of_rows = update.execute_named(named_params! {
             ":id": entry.id,
-            ":revision": entry.revision,
-            ":hash": entry.hash,
-            ":prev_hash": entry.prev_hash,
             ":data": entry.data,
         })?;
         assert!(number_of_rows == 1);
@@ -149,9 +144,6 @@ fn delete(id: web::Path<String>, pool: web::Data<Pool>) -> Result<HttpResponse, 
 #[derive(Debug, Serialize, Deserialize)]
 struct DBEntry {
     id: String,
-    revision: i64,
-    hash: Vec<u8>,
-    prev_hash: Option<Vec<u8>>,
     data: JSON,
 }
 
@@ -159,10 +151,7 @@ impl DBEntry {
     fn from_row(row: &Row) -> Result<Self, SqliteError> {
         Ok(Self {
             id: row.get(0)?,
-            revision: row.get(1)?,
-            hash: row.get(2)?,
-            prev_hash: row.get(3)?,
-            data: row.get(4)?,
+            data: row.get(1)?,
         })
     }
 }
@@ -210,8 +199,10 @@ impl std::fmt::Display for Error {
 impl ResponseError for Error {
     fn error_response(&self) -> HttpResponse {
         use Error::*;
+        use rusqlite::Error::QueryReturnedNoRows;
+
         match self {
-            Sqlite(rusqlite::Error::QueryReturnedNoRows) => HttpResponse::NotFound().finish(),
+            Sqlite(QueryReturnedNoRows) => HttpResponse::NotFound().finish(),
             _ => HttpResponse::InternalServerError().finish(),
         }
     }

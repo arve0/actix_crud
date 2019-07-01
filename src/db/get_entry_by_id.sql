@@ -1,9 +1,1 @@
-select
-    id
-    ,revision
-    ,hash
-    ,prev_hash
-    ,data
-from entries
-where id=?1
-;
+select id, data from entries where id=?1;
