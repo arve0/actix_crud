@@ -1,4 +1,4 @@
-- actix-sqlite-crud
 - key, value
 - auth
 - per user db
+- dependencies
