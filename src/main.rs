@@ -1,4 +1,5 @@
 use actix_web::{middleware, web, App, HttpResponse, HttpServer, ResponseError};
+use log;
 use r2d2_sqlite;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
@@ -22,9 +23,10 @@ fn main() -> Result<(), failure::Error> {
                     .route(web::get().to(get))
                     .route(web::delete().to(delete)),
             )
-            .service(web::resource("/")
-            .route(web::post().to(insert))
-            .route(web::put().to(update))
+            .service(
+                web::resource("/")
+                    .route(web::post().to(insert))
+                    .route(web::put().to(update)),
             )
     })
     .bind("127.0.0.1:8080")?;
@@ -47,7 +49,8 @@ fn get_db_create_if_missing() -> SqliteConnectionManager {
 }
 
 fn create_db() {
-    let db = Connection::open(DB_FILENAME).expect("Unable to open database.");
+    let db = Connection::open(DB_FILENAME)
+        .expect(&["Unable to open database file ", DB_FILENAME].concat());
 
     db.execute(include_str!("db/schema.sql"), NO_PARAMS)
         .expect("Unable to create table in database.");
@@ -65,11 +68,7 @@ fn enable_write_ahead_logging(db: &Connection) {
 
 fn get(id: web::Path<String>, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
-    let mut get_by_id = db
-        .prepare_cached(include_str!("db/get_entry_by_id.sql"))
-        .expect("Unable to parse db/get_entry_by_id.sql");
-        // TODO: log error + 500 response
-
+    let mut get_by_id = db.prepare_cached(include_str!("db/get_entry_by_id.sql"))?;
     let result = get_by_id.query_row(&[id.into_inner()], DBEntry::from_row)?;
 
     Ok(HttpResponse::Ok().json(result))
@@ -77,16 +76,11 @@ fn get(id: web::Path<String>, pool: web::Data<Pool>) -> Result<HttpResponse, Err
 
 fn insert(entry: web::Json<DBEntry>, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
-    let mut count_by_id = db
-        .prepare_cached(include_str!("db/count_by_id.sql"))
-        .expect("Unable to parse db/count_by_id.sql");
-
+    let mut count_by_id = db.prepare_cached(include_str!("db/count_by_id.sql"))?;
     let count: i64 = count_by_id.query_row(&[&entry.id], |row| row.get(0))?;
 
     if count == 0 {
-        let mut insert = db
-            .prepare_cached(include_str!("db/insert.sql"))
-            .expect("Unable to parse db/insert.sql");
+        let mut insert = db.prepare_cached(include_str!("db/insert.sql"))?;
         let number_of_rows = insert.execute_named(named_params! {
             ":id": entry.id,
             ":data": entry.data,
@@ -102,16 +96,11 @@ fn insert(entry: web::Json<DBEntry>, pool: web::Data<Pool>) -> Result<HttpRespon
 
 fn update(entry: web::Json<DBEntry>, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
-    let mut count_by_id = db
-        .prepare_cached(include_str!("db/count_by_id.sql"))
-        .expect("Unable to parse db/count_by_id.sql");
-
+    let mut count_by_id = db.prepare_cached(include_str!("db/count_by_id.sql"))?;
     let count: i64 = count_by_id.query_row(&[&entry.id], |row| row.get(0))?;
 
     if count == 1 {
-        let mut update = db
-            .prepare_cached(include_str!("db/update.sql"))
-            .expect("Unable to parse db/update.sql");
+        let mut update = db.prepare_cached(include_str!("db/update.sql"))?;
         let number_of_rows = update.execute_named(named_params! {
             ":id": entry.id,
             ":data": entry.data,
@@ -126,10 +115,7 @@ fn update(entry: web::Json<DBEntry>, pool: web::Data<Pool>) -> Result<HttpRespon
 
 fn delete(id: web::Path<String>, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
-    let mut delete_by_id = db
-        .prepare_cached(include_str!("db/delete_by_id.sql"))
-        .expect("Unable to parse db/delete_by_id.sql");
-
+    let mut delete_by_id = db.prepare_cached(include_str!("db/delete_by_id.sql"))?;
     let affected_rows = delete_by_id.execute(&[id.into_inner()])?;
 
     if affected_rows == 1 {
@@ -198,12 +184,15 @@ impl std::fmt::Display for Error {
 
 impl ResponseError for Error {
     fn error_response(&self) -> HttpResponse {
-        use Error::*;
         use rusqlite::Error::QueryReturnedNoRows;
+        use Error::*;
 
         match self {
             Sqlite(QueryReturnedNoRows) => HttpResponse::NotFound().finish(),
-            _ => HttpResponse::InternalServerError().finish(),
+            error => {
+                log::error!("{:?}", error);
+                HttpResponse::InternalServerError().finish()
+            }
         }
     }
 }
