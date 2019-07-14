@@ -21,7 +21,7 @@ fn create_db(filename: &str) {
     let db = Connection::open(filename)
         .unwrap_or_else(|_| panic!(format!("Unable to open database file {}", filename)));
 
-    db.execute(include_str!("db/schema.sql"), NO_PARAMS)
+    db.execute(include_str!("db_entry/schema.sql"), NO_PARAMS)
         .expect("Unable to create table in database.");
 
     enable_write_ahead_logging(&db);
