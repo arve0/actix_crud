@@ -1,5 +1,5 @@
+use actix_web::error::{Error as WebError, ErrorConflict, ErrorInternalServerError};
 use actix_web::{middleware, web, App, HttpResponse, HttpServer, ResponseError};
-use log;
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
 use rusqlite::{named_params, Error as SqliteError, Row};
 use serde_derive::{Deserialize, Serialize};
@@ -85,7 +85,8 @@ impl DBEntry {
     }
 
     fn insert(&self, db: PooledConnection) -> Result<(), SqliteError> {
-        let number_of_rows = db.prepare_cached(include_str!("db/insert.sql"))?
+        let number_of_rows = db
+            .prepare_cached(include_str!("db/insert.sql"))?
             .execute_named(named_params! {
                 ":id": self.id,
                 ":data": self.data,
@@ -97,7 +98,8 @@ impl DBEntry {
 
     fn update(&self, db: PooledConnection) -> Result<(), SqliteError> {
         if self.exists(&db)? {
-            let number_of_rows = db.prepare_cached(include_str!("db/update.sql"))?
+            let number_of_rows = db
+                .prepare_cached(include_str!("db/update.sql"))?
                 .execute_named(named_params! {
                     ":id": self.id,
                     ":data": self.data,
@@ -122,61 +124,49 @@ impl DBEntry {
     }
 }
 
+/**
+ * Wrap actix_web::Error inside our own error type, such
+ * that we can implement the From trait and avoid
+ * Result::map_err all over the place.
+ */
 #[derive(Debug)]
-enum Error {
-    Pool(r2d2::Error),
-    Sqlite(SqliteError),
-}
-
-impl std::error::Error for Error {
-    fn description(&self) -> &str {
-        "asdf"
-    }
-    fn cause(&self) -> Option<&dyn std::error::Error> {
-        None
-    }
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
-    }
-}
+struct Error(WebError);
 
 impl From<r2d2::Error> for Error {
     fn from(error: r2d2::Error) -> Self {
-        Error::Pool(error)
+        Error(ErrorInternalServerError(error))
     }
 }
 
 impl From<SqliteError> for Error {
     fn from(error: SqliteError) -> Self {
-        Error::Sqlite(error)
+        use libsqlite3_sys::Error as LibSqliteError;
+        use libsqlite3_sys::ErrorCode::ConstraintViolation;
+        use rusqlite::Error::SqliteFailure;
+
+        match error {
+            // when inserting and document exists
+            SqliteFailure(
+                LibSqliteError {
+                    code: ConstraintViolation,
+                    extended_code: 1555,
+                },
+                Some(_),
+            ) => Self(ErrorConflict("document already exists")),
+            error => Self(ErrorInternalServerError(error)),
+        }
     }
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        use Error::*;
-        match self {
-            Pool(error) => error.fmt(f),
-            Sqlite(error) => error.fmt(f),
-        }
+        self.0.fmt(f)
     }
 }
 
 impl ResponseError for Error {
     fn error_response(&self) -> HttpResponse {
-        use rusqlite::Error::{SqliteFailure, QueryReturnedNoRows};
-        use libsqlite3_sys::{Error as LibSqliteError};
-        use libsqlite3_sys::ErrorCode::ConstraintViolation;
-        use Error::*;
-
-        match self {
-            Sqlite(QueryReturnedNoRows) => HttpResponse::NotFound().finish(),
-            Sqlite(SqliteFailure(LibSqliteError { code: ConstraintViolation, extended_code: 1555 }, Some(_))) => HttpResponse::Conflict().finish(),
-            error => {
-                log::error!("{:?}", error);
-                HttpResponse::InternalServerError().finish()
-            }
-        }
+        self.0.as_response_error().error_response()
     }
 }
 
