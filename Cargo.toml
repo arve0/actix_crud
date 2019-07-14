@@ -13,6 +13,7 @@ log = "0.4.6"
 r2d2 = "0.8.2"
 r2d2_sqlite = "0.10.0"
 rusqlite = "0.18"
+libsqlite3-sys = "*"
 serde = "1.0"
 serde_json = { version = "1.0", features = ["raw_value"] }
 serde_derive = "1.0"

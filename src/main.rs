@@ -1,14 +1,12 @@
 use actix_web::{middleware, web, App, HttpResponse, HttpServer, ResponseError};
 use log;
-use r2d2_sqlite;
-use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
-use rusqlite::{named_params, Connection, Error as SqliteError, Row, NO_PARAMS};
+use rusqlite::{named_params, Error as SqliteError, Row};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::value::RawValue;
-use std::path::Path;
 
-type Pool = r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>;
+mod db;
+use db::{Pool, PooledConnection};
 
 fn main() -> Result<(), failure::Error> {
     // enable logging with RUST_LOG=info
@@ -16,7 +14,7 @@ fn main() -> Result<(), failure::Error> {
 
     let server = HttpServer::new(move || {
         App::new()
-            .data(get_db_pool())
+            .data(db::get_pool("entries.sqlite"))
             .wrap(middleware::Logger::default())
             .service(
                 web::resource("/{id}")
@@ -35,95 +33,35 @@ fn main() -> Result<(), failure::Error> {
     server.run().map_err(failure::Error::from)
 }
 
-const DB_FILENAME: &str = "entries.sqlite";
-
-fn get_db_pool() -> Pool {
-    Pool::new(get_db_create_if_missing()).expect("Unable to create db pool.")
-}
-
-fn get_db_create_if_missing() -> SqliteConnectionManager {
-    if !Path::new(DB_FILENAME).exists() {
-        create_db()
-    }
-    SqliteConnectionManager::file(DB_FILENAME)
-}
-
-fn create_db() {
-    let db = Connection::open(DB_FILENAME)
-        .expect(&["Unable to open database file ", DB_FILENAME].concat());
-
-    db.execute(include_str!("db/schema.sql"), NO_PARAMS)
-        .expect("Unable to create table in database.");
-
-    enable_write_ahead_logging(&db);
-}
-
-fn enable_write_ahead_logging(db: &Connection) {
-    // PRAGMA journal_mode=wal;
-    let result: String = db
-        .pragma_update_and_check(None, "journal_mode", &"wal", |row| row.get(0))
-        .unwrap();
-    assert!("wal" == &result);
-}
-
 fn get(id: web::Path<String>, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
-    let mut get_by_id = db.prepare_cached(include_str!("db/get_entry_by_id.sql"))?;
-    let result = get_by_id.query_row(&[id.into_inner()], DBEntry::from_row)?;
+    let entry = DBEntry::get_by_id(db, id.into_inner())?;
 
-    Ok(HttpResponse::Ok().json(result))
+    Ok(HttpResponse::Ok().json(entry))
 }
 
 fn insert(entry: web::Json<DBEntry>, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
-    let mut count_by_id = db.prepare_cached(include_str!("db/count_by_id.sql"))?;
-    let count: i64 = count_by_id.query_row(&[&entry.id], |row| row.get(0))?;
-
-    if count == 0 {
-        let mut insert = db.prepare_cached(include_str!("db/insert.sql"))?;
-        let number_of_rows = insert.execute_named(named_params! {
-            ":id": entry.id,
-            ":data": entry.data,
-        })?;
-        assert!(number_of_rows == 1);
-    } else {
-        return Ok(HttpResponse::Conflict()
-            .body(r#"{"ok":false,"error":"Existing document with same id exists"}"#));
-    }
+    entry.insert(db)?;
 
     Ok(HttpResponse::Created().body(r#"{"ok":true}"#))
 }
 
 fn update(entry: web::Json<DBEntry>, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
-    let mut count_by_id = db.prepare_cached(include_str!("db/count_by_id.sql"))?;
-    let count: i64 = count_by_id.query_row(&[&entry.id], |row| row.get(0))?;
-
-    if count == 1 {
-        let mut update = db.prepare_cached(include_str!("db/update.sql"))?;
-        let number_of_rows = update.execute_named(named_params! {
-            ":id": entry.id,
-            ":data": entry.data,
-        })?;
-        assert!(number_of_rows == 1);
-    } else {
-        return insert(entry, pool);
-    }
+    entry.update(db)?;
 
     Ok(HttpResponse::Created().body(r#"{"ok":true}"#))
 }
 
 fn delete(id: web::Path<String>, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
-    let mut delete_by_id = db.prepare_cached(include_str!("db/delete_by_id.sql"))?;
-    let affected_rows = delete_by_id.execute(&[id.into_inner()])?;
+    let deleted = DBEntry::delete(db, id.into_inner())?;
 
-    if affected_rows == 1 {
+    if deleted {
         Ok(HttpResponse::Ok().body(r#"{"ok":true}"#))
-    } else if affected_rows == 0 {
-        return Ok(HttpResponse::NotFound().body(r#"{"ok":false,"error":"Document not found"}"#));
     } else {
-        panic!("Removed more then 1 row")
+        Ok(HttpResponse::NotFound().body(r#"{"ok":false,"error":"Document not found"}"#))
     }
 }
 
@@ -139,6 +77,48 @@ impl DBEntry {
             id: row.get(0)?,
             data: row.get(1)?,
         })
+    }
+
+    fn get_by_id(db: PooledConnection, id: String) -> Result<Self, SqliteError> {
+        db.prepare_cached(include_str!("db/get_entry_by_id.sql"))?
+            .query_row(&[id], Self::from_row)
+    }
+
+    fn insert(&self, db: PooledConnection) -> Result<(), SqliteError> {
+        let number_of_rows = db.prepare_cached(include_str!("db/insert.sql"))?
+            .execute_named(named_params! {
+                ":id": self.id,
+                ":data": self.data,
+            })?;
+
+        assert!(number_of_rows == 1);
+        Ok(())
+    }
+
+    fn update(&self, db: PooledConnection) -> Result<(), SqliteError> {
+        if self.exists(&db)? {
+            let number_of_rows = db.prepare_cached(include_str!("db/update.sql"))?
+                .execute_named(named_params! {
+                    ":id": self.id,
+                    ":data": self.data,
+                })?;
+            assert!(number_of_rows == 1);
+            Ok(())
+        } else {
+            self.insert(db)
+        }
+    }
+
+    fn exists(&self, db: &PooledConnection) -> Result<bool, SqliteError> {
+        db.prepare_cached(include_str!("db/count_by_id.sql"))?
+            .query_row(&[&self.id], |row| row.get(0))
+            .map(|count: i64| count != 0)
+    }
+
+    fn delete(db: PooledConnection, id: String) -> Result<bool, SqliteError> {
+        db.prepare_cached(include_str!("db/delete_by_id.sql"))?
+            .execute(&[id])
+            .map(|count| count != 0)
     }
 }
 
@@ -184,11 +164,14 @@ impl std::fmt::Display for Error {
 
 impl ResponseError for Error {
     fn error_response(&self) -> HttpResponse {
-        use rusqlite::Error::QueryReturnedNoRows;
+        use rusqlite::Error::{SqliteFailure, QueryReturnedNoRows};
+        use libsqlite3_sys::{Error as LibSqliteError};
+        use libsqlite3_sys::ErrorCode::ConstraintViolation;
         use Error::*;
 
         match self {
             Sqlite(QueryReturnedNoRows) => HttpResponse::NotFound().finish(),
+            Sqlite(SqliteFailure(LibSqliteError { code: ConstraintViolation, extended_code: 1555 }, Some(_))) => HttpResponse::Conflict().finish(),
             error => {
                 log::error!("{:?}", error);
                 HttpResponse::InternalServerError().finish()
