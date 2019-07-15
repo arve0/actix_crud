@@ -1,20 +1,25 @@
-curl -X POST -d @src/test_data.json -H 'content-type: application/json' localhost:8080/
-echo ""
-curl localhost:8080/12345
-echo ""
-curl -X PUT -d @src/test_data_update.json -H 'content-type: application/json' localhost:8080/
-echo ""
-curl localhost:8080/12345
-echo ""
-curl -X DELETE localhost:8080/12345
-echo ""
+# output: body + status code, read cookies from file
+base=localhost:8080
+
+# clear user database
+rm -f cookies
 sqlite3 database.sqlite "delete from users"
 sqlite3 database.sqlite "delete from user_sessions"
-curl -d 'username=adsf&password=1234' localhost:8080/user/register -c cookies
-echo ""
-curl localhost:8080/user/logout -b cookies
-echo ""
-curl -d 'username=adsf&password=1234' localhost:8080/user/login -c cookies
-echo ""
-curl localhost:8080/user/logout -b cookies
-echo ""
+# register user
+curl -w ' %{http_code}\n' -b cookies -c cookies -d 'username=adsf&password=1234' $base/user/register
+# logout
+curl -w ' %{http_code}\n' -b cookies -c cookies $base/user/logout
+# login
+curl -w ' %{http_code}\n' -b cookies -c cookies -d 'username=adsf&password=1234' $base/user/login
+# insert data
+curl -w ' %{http_code}\n' -b cookies -c cookies -X POST -d @src/test_data.json -H 'content-type: application/json' $base
+# get inserted data
+curl -w ' %{http_code}\n' -b cookies -c cookies $base/12345
+# update inserted data
+curl -w ' %{http_code}\n' -b cookies -c cookies -X PUT -d @src/test_data_update.json -H 'content-type: application/json' $base
+# get updated data
+curl -w ' %{http_code}\n' -b cookies -c cookies $base/12345
+# delete data
+curl -w ' %{http_code}\n' -b cookies -c cookies -X DELETE $base/12345
+# logout
+curl -w ' %{http_code}\n' -b cookies -c cookies $base/user/logout
