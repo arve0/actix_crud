@@ -1,5 +1,5 @@
-use rusqlite::{named_params, Error as SqliteError, Row};
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
+use rusqlite::{named_params, Error as SqliteError, Row};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 

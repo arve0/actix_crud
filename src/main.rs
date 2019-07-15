@@ -1,12 +1,16 @@
+use actix_session::CookieSession;
 use actix_web::error::{Error as WebError, ErrorConflict, ErrorInternalServerError};
 use actix_web::{middleware, web, App, HttpResponse, HttpServer, ResponseError};
-use rusqlite::{Error as SqliteError};
+use bcrypt::BcryptError;
+use rusqlite::Error as SqliteError;
 
 mod db;
 mod db_entry;
+mod user;
 
-use db::Pool;
+use db::{is_primary_key_constraint, Pool};
 use db_entry::DBEntry;
+use user::user_config;
 
 fn main() -> Result<(), failure::Error> {
     // enable logging with RUST_LOG=info
@@ -14,8 +18,13 @@ fn main() -> Result<(), failure::Error> {
 
     let server = HttpServer::new(move || {
         App::new()
-            .data(db::get_pool("entries.sqlite"))
+            .data(db::get_pool())
             .wrap(middleware::Logger::default())
+            .wrap(
+                CookieSession::signed(&[0; 32]) // TODO: signing key
+                    .secure(false),
+            )
+            .configure(user_config)
             .service(
                 web::resource("/{id}")
                     .route(web::get().to(get))
@@ -71,7 +80,7 @@ fn delete(id: web::Path<String>, pool: web::Data<Pool>) -> Result<HttpResponse, 
  * Result::map_err all over the place.
  */
 #[derive(Debug)]
-struct Error(WebError);
+pub struct Error(WebError);
 
 impl From<r2d2::Error> for Error {
     fn from(error: r2d2::Error) -> Self {
@@ -81,21 +90,23 @@ impl From<r2d2::Error> for Error {
 
 impl From<SqliteError> for Error {
     fn from(error: SqliteError) -> Self {
-        use libsqlite3_sys::Error as LibSqliteError;
-        use libsqlite3_sys::ErrorCode::ConstraintViolation;
-        use rusqlite::Error::SqliteFailure;
-
-        match error {
-            // when inserting and document exists
-            SqliteFailure(
-                LibSqliteError {
-                    code: ConstraintViolation,
-                    extended_code: 1555,
-                },
-                Some(_),
-            ) => Self(ErrorConflict("document already exists")),
-            error => Self(ErrorInternalServerError(error)),
+        if is_primary_key_constraint(&error) {
+            Self(ErrorConflict("conflict"))
+        } else {
+            Self(ErrorInternalServerError(error))
         }
+    }
+}
+
+impl From<WebError> for Error {
+    fn from(error: WebError) -> Self {
+        Self(error)
+    }
+}
+
+impl From<BcryptError> for Error {
+    fn from(error: BcryptError) -> Self {
+        Self(ErrorInternalServerError(error))
     }
 }
 
@@ -110,4 +121,3 @@ impl ResponseError for Error {
         self.0.as_response_error().error_response()
     }
 }
-
