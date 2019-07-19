@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 const PASSWORD_HASH_COST: u32 = 4;
 
-pub fn user_config(cfg: &mut web::ServiceConfig) {
+pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/user")
             .route("/register", web::to(register))

@@ -2,8 +2,64 @@ use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, 
 use rusqlite::{named_params, Error as SqliteError, Row};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::value::RawValue;
+use actix_web::error::{ErrorInternalServerError, ErrorNotFound};
+use actix_web::{web, HttpResponse};
 
-use crate::db::PooledConnection;
+use crate::Error;
+use crate::db::{Pool, PooledConnection};
+use crate::user::AuthorizedUser;
+
+pub fn config(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("")
+            .service(
+                web::resource("/{id}")
+                    .route(web::get().to(get))
+                    .route(web::delete().to(delete)),
+            )
+            .service(
+                web::resource("/")
+                    .route(web::post().to(insert))
+                    .route(web::put().to(update)),
+            )
+    );
+}
+
+fn get(id: web::Path<String>, login: AuthorizedUser, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
+    let db = pool.get()?;
+    let entry = DBEntry::get_by_id(db, id.into_inner())
+        .map_err(|err| match err {
+            SqliteError::QueryReturnedNoRows => ErrorNotFound("not found"),
+            err => ErrorInternalServerError(err),
+        })?;
+
+    Ok(HttpResponse::Ok().json(entry))
+}
+
+fn insert(entry: web::Json<DBEntry>, login: AuthorizedUser, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
+    let db = pool.get()?;
+    entry.insert(db)?;
+
+    Ok(HttpResponse::Created().body("created"))
+}
+
+fn update(entry: web::Json<DBEntry>, login: AuthorizedUser, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
+    let db = pool.get()?;
+    entry.update(db)?;
+
+    Ok(HttpResponse::Ok().body("updated"))
+}
+
+fn delete(id: web::Path<String>, login: AuthorizedUser, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
+    let db = pool.get()?;
+    let deleted = DBEntry::delete(db, id.into_inner())?;
+
+    if deleted {
+        Ok(HttpResponse::Ok().body(r#"deleted"#))
+    } else {
+        Ok(HttpResponse::NotFound().body(r#"not found"#))
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DBEntry {

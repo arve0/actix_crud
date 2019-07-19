@@ -1,6 +1,6 @@
 use actix_session::CookieSession;
-use actix_web::error::{Error as WebError, ErrorConflict, ErrorInternalServerError, ErrorNotFound};
-use actix_web::{middleware, web, App, HttpResponse, HttpServer, ResponseError};
+use actix_web::error::{Error as WebError, ErrorConflict, ErrorInternalServerError};
+use actix_web::{middleware, App, HttpResponse, HttpServer, ResponseError};
 use bcrypt::BcryptError;
 use rusqlite::Error as SqliteError;
 
@@ -8,9 +8,7 @@ mod db;
 mod document;
 mod user;
 
-use db::{is_primary_key_constraint, Pool};
-use document::DBEntry;
-use user::{user_config, AuthorizedUser};
+use db::is_primary_key_constraint;
 
 fn main() -> Result<(), failure::Error> {
     // enable logging with RUST_LOG=info
@@ -24,58 +22,13 @@ fn main() -> Result<(), failure::Error> {
                 CookieSession::signed(&[0; 32]) // TODO: signing key
                     .secure(false),
             )
-            .configure(user_config)
-            .service(
-                web::resource("/{id}")
-                    .route(web::get().to(get))
-                    .route(web::delete().to(delete)),
-            )
-            .service(
-                web::resource("/")
-                    .route(web::post().to(insert))
-                    .route(web::put().to(update)),
-            )
+            .configure(user::config)
+            .configure(document::config)
     })
     .bind("127.0.0.1:8080")?;
 
     println!("Started http server: 127.0.0.1:8080");
     server.run().map_err(failure::Error::from)
-}
-
-fn get(id: web::Path<String>, login: AuthorizedUser, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
-    let db = pool.get()?;
-    let entry = DBEntry::get_by_id(db, id.into_inner())
-        .map_err(|err| match err {
-            SqliteError::QueryReturnedNoRows => ErrorNotFound("not found"),
-            err => ErrorInternalServerError(err),
-        })?;
-
-    Ok(HttpResponse::Ok().json(entry))
-}
-
-fn insert(entry: web::Json<DBEntry>, login: AuthorizedUser, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
-    let db = pool.get()?;
-    entry.insert(db)?;
-
-    Ok(HttpResponse::Created().body("created"))
-}
-
-fn update(entry: web::Json<DBEntry>, login: AuthorizedUser, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
-    let db = pool.get()?;
-    entry.update(db)?;
-
-    Ok(HttpResponse::Ok().body("updated"))
-}
-
-fn delete(id: web::Path<String>, login: AuthorizedUser, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
-    let db = pool.get()?;
-    let deleted = DBEntry::delete(db, id.into_inner())?;
-
-    if deleted {
-        Ok(HttpResponse::Ok().body(r#"deleted"#))
-    } else {
-        Ok(HttpResponse::NotFound().body(r#"not found"#))
-    }
 }
 
 /**
