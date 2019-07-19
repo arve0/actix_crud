@@ -53,14 +53,14 @@ fn insert(entry: web::Json<DBEntry>, pool: web::Data<Pool>) -> Result<HttpRespon
     let db = pool.get()?;
     entry.insert(db)?;
 
-    Ok(HttpResponse::Created().body(r#"{"ok":true}"#))
+    Ok(HttpResponse::Created().body("created"))
 }
 
 fn update(entry: web::Json<DBEntry>, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
     entry.update(db)?;
 
-    Ok(HttpResponse::Created().body(r#"{"ok":true}"#))
+    Ok(HttpResponse::Ok().body("updated"))
 }
 
 fn delete(id: web::Path<String>, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
@@ -68,9 +68,9 @@ fn delete(id: web::Path<String>, pool: web::Data<Pool>) -> Result<HttpResponse, 
     let deleted = DBEntry::delete(db, id.into_inner())?;
 
     if deleted {
-        Ok(HttpResponse::Ok().body(r#"{"ok":true}"#))
+        Ok(HttpResponse::Ok().body(r#"deleted"#))
     } else {
-        Ok(HttpResponse::NotFound().body(r#"{"ok":false,"error":"Document not found"}"#))
+        Ok(HttpResponse::NotFound().body(r#"not found"#))
     }
 }
 
