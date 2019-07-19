@@ -1,5 +1,5 @@
 use actix_session::CookieSession;
-use actix_web::error::{Error as WebError, ErrorConflict, ErrorInternalServerError};
+use actix_web::error::{Error as WebError, ErrorConflict, ErrorInternalServerError, ErrorNotFound};
 use actix_web::{middleware, web, App, HttpResponse, HttpServer, ResponseError};
 use bcrypt::BcryptError;
 use rusqlite::Error as SqliteError;
@@ -10,7 +10,7 @@ mod user;
 
 use db::{is_primary_key_constraint, Pool};
 use db_entry::DBEntry;
-use user::user_config;
+use user::{user_config, AuthorizedUser};
 
 fn main() -> Result<(), failure::Error> {
     // enable logging with RUST_LOG=info
@@ -42,28 +42,32 @@ fn main() -> Result<(), failure::Error> {
     server.run().map_err(failure::Error::from)
 }
 
-fn get(id: web::Path<String>, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
+fn get(id: web::Path<String>, login: AuthorizedUser, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
-    let entry = DBEntry::get_by_id(db, id.into_inner())?;
+    let entry = DBEntry::get_by_id(db, id.into_inner())
+        .map_err(|err| match err {
+            SqliteError::QueryReturnedNoRows => ErrorNotFound("not found"),
+            err => ErrorInternalServerError(err),
+        })?;
 
     Ok(HttpResponse::Ok().json(entry))
 }
 
-fn insert(entry: web::Json<DBEntry>, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
+fn insert(entry: web::Json<DBEntry>, login: AuthorizedUser, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
     entry.insert(db)?;
 
     Ok(HttpResponse::Created().body("created"))
 }
 
-fn update(entry: web::Json<DBEntry>, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
+fn update(entry: web::Json<DBEntry>, login: AuthorizedUser, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
     entry.update(db)?;
 
     Ok(HttpResponse::Ok().body("updated"))
 }
 
-fn delete(id: web::Path<String>, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
+fn delete(id: web::Path<String>, login: AuthorizedUser, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
     let deleted = DBEntry::delete(db, id.into_inner())?;
 

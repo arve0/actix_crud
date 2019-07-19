@@ -4,7 +4,9 @@ base=localhost:8080
 assert () {
   if [ "$1" != "$2" ]
   then
-    echo "Assertion failure:  '$1' != '$2'"
+    echo "Assertion failure:"
+    echo "Expected:  '$2'"
+    echo "Actually:  '$1'"
     exit 1
   fi
 }
@@ -15,6 +17,25 @@ sqlite3 database.sqlite "delete from entries"
 sqlite3 database.sqlite "delete from users"
 sqlite3 database.sqlite "delete from user_sessions"
 
+## Not logged in - all should fail
+expected='unauthorized 401'
+# get
+result=$(curl -s -w ' %{http_code}' -b cookies -c cookies $base/12345)
+assert "$result" "$expected"
+
+# insert
+result=$(curl -s -w ' %{http_code}' -b cookies -c cookies -X POST -d @src/test_data.json -H 'content-type: application/json' $base)
+assert "$result" "$expected"
+
+# update
+result=$(curl -s -w ' %{http_code}' -b cookies -c cookies -X PUT -d @src/test_data_update.json -H 'content-type: application/json' $base)
+assert "$result" "$expected"
+
+# delete missing data
+result=$(curl -s -w ' %{http_code}' -b cookies -c cookies -X DELETE $base/12345)
+assert "$result" "$expected"
+
+## Register and login
 # register user
 result=$(curl -s -w ' %{http_code}' -b cookies -c cookies -d 'username=adsf&password=1234' $base/user/register)
 expected="user created 200"
@@ -30,9 +51,19 @@ result=$(curl -s -w ' %{http_code}' -b cookies -c cookies -d 'username=adsf&pass
 expected="logged in 200"
 assert "$result" "$expected"
 
+# get non-existent data
+result=$(curl -s -w ' %{http_code}' -b cookies -c cookies $base/12345)
+expected="not found 404"
+assert "$result" "$expected"
+
 # insert data
 result=$(curl -s -w ' %{http_code}' -b cookies -c cookies -X POST -d @src/test_data.json -H 'content-type: application/json' $base)
 expected="created 201"
+assert "$result" "$expected"
+
+# insert data again
+result=$(curl -s -w ' %{http_code}' -b cookies -c cookies -X POST -d @src/test_data.json -H 'content-type: application/json' $base)
+expected="conflict 409"
 assert "$result" "$expected"
 
 # get inserted data
