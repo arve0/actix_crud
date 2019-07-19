@@ -1,1 +1,1 @@
-select id, data from entries where id=?1;
+select id, data from documents where id=:id and username=:username;

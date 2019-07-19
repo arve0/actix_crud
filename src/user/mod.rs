@@ -123,7 +123,7 @@ impl UnauthorizedUser {
 
 // verified from session cookie and persistent storage
 pub struct AuthorizedUser {
-    username: String,
+    pub username: String,
     session: Session,
     uuid: Uuid,
 }

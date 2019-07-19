@@ -1,1 +1,1 @@
-insert into entries (id, data) values (:id, :data);
+insert into documents (id, username, data) values (:id, :username, :data);

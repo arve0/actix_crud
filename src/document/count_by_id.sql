@@ -1,1 +1,1 @@
-select count(*) from entries where id=?1;
+select count(*) from documents where id=:id and username=:username;

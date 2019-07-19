@@ -1,1 +1,1 @@
-delete from entries where id=?1;
+delete from documents where id=:id and username=:username;
