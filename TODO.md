@@ -1,5 +1,7 @@
-- store username along with documents
-- per user db
+- benchmark
+- static files
+- readme
+- client side example
 - refactor auth?
   a. implement SqliteSession?
   b. into user object?
