@@ -143,3 +143,5 @@ description="logout"
 expected="logged out 200"
 result=$(curl -s -w ' %{http_code}' -b cookies -c cookies $base/user/logout)
 assert
+
+echo "All tests OK"
