@@ -23,8 +23,8 @@ fn create_db() {
     let db = Connection::open(DB_FILENAME)
         .unwrap_or_else(|_| panic!(format!("Unable to open database file {}", DB_FILENAME)));
 
-    db.execute_batch(include_str!("db_entry/schema.sql"))
-        .expect("Failed to execute db_entry schema.");
+    db.execute_batch(include_str!("document/schema.sql"))
+        .expect("Failed to execute document schema.");
     db.execute_batch(include_str!("user/schema.sql"))
         .expect("Failed to execute user schema.");
 

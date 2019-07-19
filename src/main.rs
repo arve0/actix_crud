@@ -5,11 +5,11 @@ use bcrypt::BcryptError;
 use rusqlite::Error as SqliteError;
 
 mod db;
-mod db_entry;
+mod document;
 mod user;
 
 use db::{is_primary_key_constraint, Pool};
-use db_entry::DBEntry;
+use document::DBEntry;
 use user::{user_config, AuthorizedUser};
 
 fn main() -> Result<(), failure::Error> {
