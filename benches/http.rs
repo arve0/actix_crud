@@ -53,18 +53,16 @@ fn http_benchmark(c: &mut Criterion) {
             .unwrap();
         assert!(login_response.status() == http::StatusCode::CREATED);
 
-        let mut i = 0;
+        let document = r#"{"id":"1","data":{"b":111}}"#;
 
         b.iter(|| {
-            i += 1;
-            let document = format!(r#"{{"id":"{}","data":{{"b":111}}}}"#, i);
-            let create_request = test::TestRequest::post()
+            let create_request = test::TestRequest::put()
                 .cookie(cookie.clone())
                 .header("content-type", "application/json")
                 .set_payload(document)
                 .to_request();
             let create_response = test::block_on(app.call(create_request)).unwrap();
-            assert!(create_response.status() == http::StatusCode::CREATED);
+            assert!(create_response.status() == http::StatusCode::OK);
         })
     });
 
