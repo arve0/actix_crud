@@ -3,7 +3,7 @@ use crate::Error;
 use actix_session::Session;
 use actix_web::dev::Payload;
 use actix_web::error::{ErrorBadRequest, ErrorInternalServerError, ErrorUnauthorized};
-use actix_web::{web, FromRequest, HttpRequest};
+use actix_web::{web, FromRequest, HttpRequest, HttpResponse};
 use bcrypt::{hash, verify};
 use rusqlite::Error as SqliteError;
 use rusqlite::Error::QueryReturnedNoRows;
@@ -26,11 +26,11 @@ fn register(
     user: web::Form<User>,
     login: UnauthorizedUser,
     pool: web::Data<Pool>,
-) -> Result<&'static str, Error> {
+) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
     user.create(&db)?;
     login.create_session(&user.username, &db)?;
-    Ok("user created")
+    Ok(HttpResponse::Created().body("user created"))
 }
 
 fn login(

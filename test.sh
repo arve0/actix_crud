@@ -48,7 +48,7 @@ assert
 
 # Registered and logged in
 description="register user"
-expected="user created 200"
+expected="user created 201"
 result=$(curl -s -w ' %{http_code}' -b cookies -c cookies -d 'username=adsf&password=1234' $base/user/register)
 assert
 
@@ -112,7 +112,7 @@ assert
 
 # Registered another user
 description="register thief user"
-expected="user created 200"
+expected="user created 201"
 result=$(curl -s -w ' %{http_code}' -b cookies -c cookies -d 'username=thief&password=1234' $base/user/register)
 assert
 
