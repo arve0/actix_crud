@@ -1,13 +1,13 @@
+use actix_web::error::{ErrorInternalServerError, ErrorNotFound};
+use actix_web::{web, HttpResponse};
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
 use rusqlite::{named_params, Error as SqliteError, Row};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::value::RawValue;
-use actix_web::error::{ErrorInternalServerError, ErrorNotFound};
-use actix_web::{web, HttpResponse};
 
-use crate::Error;
 use crate::db::{Pool, PooledConnection};
 use crate::user::AuthorizedUser;
+use crate::Error;
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -21,14 +21,18 @@ pub fn config(cfg: &mut web::ServiceConfig) {
                 web::resource("/")
                     .route(web::post().to(insert))
                     .route(web::put().to(update)),
-            )
+            ),
     );
 }
 
-fn get(id: web::Path<String>, login: AuthorizedUser, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
+fn get(
+    id: web::Path<String>,
+    login: AuthorizedUser,
+    pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
-    let entry = DBEntry::get_by_id(id.into_inner(), &login.username, db)
-        .map_err(|err| match err {
+    let entry =
+        DBEntry::get_by_id(id.into_inner(), &login.username, db).map_err(|err| match err {
             SqliteError::QueryReturnedNoRows => ErrorNotFound("not found"),
             err => ErrorInternalServerError(err),
         })?;
@@ -36,21 +40,33 @@ fn get(id: web::Path<String>, login: AuthorizedUser, pool: web::Data<Pool>) -> R
     Ok(HttpResponse::Ok().json(entry))
 }
 
-fn insert(document: web::Json<Document>, login: AuthorizedUser, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
+fn insert(
+    document: web::Json<Document>,
+    login: AuthorizedUser,
+    pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
     DBEntry::new(document.into_inner(), login).insert(db)?;
 
     Ok(HttpResponse::Created().body("created"))
 }
 
-fn update(document: web::Json<Document>, login: AuthorizedUser, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
+fn update(
+    document: web::Json<Document>,
+    login: AuthorizedUser,
+    pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
     DBEntry::new(document.into_inner(), login).update(db)?;
 
     Ok(HttpResponse::Ok().body("updated"))
 }
 
-fn delete(id: web::Path<String>, login: AuthorizedUser, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
+fn delete(
+    id: web::Path<String>,
+    login: AuthorizedUser,
+    pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
     let deleted = DBEntry::delete(id.into_inner(), &login.username, db)?;
 
@@ -95,10 +111,13 @@ impl DBEntry {
 
     pub fn get_by_id(id: String, username: &str, db: PooledConnection) -> DBResult<Document> {
         db.prepare_cached(include_str!("get_by_id.sql"))?
-            .query_row_named(named_params! {
-                ":id": &id,
-                ":username": &username,
-            }, Document::from_row)
+            .query_row_named(
+                named_params! {
+                    ":id": &id,
+                    ":username": &username,
+                },
+                Document::from_row,
+            )
     }
 
     pub fn insert(&self, db: PooledConnection) -> DBResult<()> {
@@ -132,16 +151,19 @@ impl DBEntry {
 
     fn exists(&self, db: &PooledConnection) -> DBResult<bool> {
         db.prepare_cached(include_str!("count_by_id.sql"))?
-            .query_row_named(named_params!{
-                ":id": self.id,
-                ":username": self.username,
-            }, |row| row.get(0))
+            .query_row_named(
+                named_params! {
+                    ":id": self.id,
+                    ":username": self.username,
+                },
+                |row| row.get(0),
+            )
             .map(|count: i64| count != 0)
     }
 
     pub fn delete(id: String, username: &str, db: PooledConnection) -> DBResult<bool> {
         db.prepare_cached(include_str!("delete_by_id.sql"))?
-            .execute_named(named_params!{
+            .execute_named(named_params! {
                 ":id": id,
                 ":username": username,
             })

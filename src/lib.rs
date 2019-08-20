@@ -1,36 +1,12 @@
-use actix_session::CookieSession;
 use actix_web::error::{Error as WebError, ErrorConflict, ErrorInternalServerError};
-use actix_web::{middleware, web, App, HttpResponse, HttpServer, ResponseError};
+use actix_web::{HttpResponse, ResponseError};
 use bcrypt::BcryptError;
+use db::is_primary_key_constraint;
 use rusqlite::Error as SqliteError;
 
-mod db;
-mod document;
-mod user;
-
-use db::is_primary_key_constraint;
-
-fn main() -> Result<(), failure::Error> {
-    // enable logging with RUST_LOG=info
-    env_logger::init();
-
-    let server = HttpServer::new(move || {
-        App::new()
-            .data(db::get_pool())
-            .wrap(middleware::Logger::default())
-            .wrap(
-                CookieSession::signed(&[0; 32]) // TODO: signing key
-                    .secure(false),
-            )
-            .route("/", web::get().to(|| ""))
-            .configure(user::config)
-            .configure(document::config)
-    })
-    .bind("127.0.0.1:8080")?;
-
-    println!("Started http server: 127.0.0.1:8080");
-    server.run().map_err(failure::Error::from)
-}
+pub mod db;
+pub mod document;
+pub mod user;
 
 /**
  * Wrap actix_web::Error inside our own error type, such
@@ -78,4 +54,20 @@ impl ResponseError for Error {
     fn error_response(&self) -> HttpResponse {
         self.0.as_response_error().error_response()
     }
+}
+
+#[test]
+fn test_init_service() {
+    use actix_web::dev::Service;
+    use actix_web::{http::StatusCode, test, web, App, HttpResponse};
+
+    let mut app =
+        test::init_service(App::new().service(web::resource("/test").to(|| HttpResponse::Ok())));
+
+    // Create request object
+    let req = test::TestRequest::with_uri("/test").to_request();
+
+    // Execute application
+    let resp = test::block_on(app.call(req)).unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
 }

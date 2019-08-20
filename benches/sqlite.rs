@@ -9,11 +9,7 @@
  *    Why do unprepared query take 8 us more time?
  *    Should not unprepared queries get the same benefit?
  */
-
-#[macro_use]
-extern crate criterion;
-
-use criterion::Criterion;
+use criterion::{criterion_group, criterion_main, Criterion};
 use rand::prelude::*;
 use rusqlite::{Connection, Statement, NO_PARAMS};
 

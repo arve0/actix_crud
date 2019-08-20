@@ -1,5 +1,5 @@
 [package]
-name = "actix-crud"
+name = "actix_crud"
 version = "0.1.0"
 authors = ["Arve Seljebu <arve.seljebu@knowit.no>"]
 edition = "2018"
@@ -29,3 +29,6 @@ rand = "0.6"
 name = "sqlite"
 harness = false
 
+[[bench]]
+name = "http"
+harness = false

@@ -1,5 +1,5 @@
-# actix-crud
-An implementation of create, read, update and delete over HTTP with [actix-web](https://actix.rs).
+# actix_crud
+An implementation of create, read, update and delete over HTTP with [actix-web](https://actix.rs) and [SQLite](https://www.sqlite.org).
 
 ## Running
 ```sh
