@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # output: body + status code, read cookies from file
 base=localhost:8080
 
@@ -20,6 +21,12 @@ rm -f cookies
 sqlite3 database.sqlite "delete from documents"
 sqlite3 database.sqlite "delete from users"
 sqlite3 database.sqlite "delete from user_sessions"
+
+# Index
+description="server is up"
+expected=' 200'
+result=$(curl -s -w ' %{http_code}' $base)
+assert
 
 # Not logged in - all should fail
 description="unauthorized get"

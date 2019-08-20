@@ -1,6 +1,6 @@
 use actix_session::CookieSession;
 use actix_web::error::{Error as WebError, ErrorConflict, ErrorInternalServerError};
-use actix_web::{middleware, App, HttpResponse, HttpServer, ResponseError};
+use actix_web::{middleware, web, App, HttpResponse, HttpServer, ResponseError};
 use bcrypt::BcryptError;
 use rusqlite::Error as SqliteError;
 
@@ -22,6 +22,7 @@ fn main() -> Result<(), failure::Error> {
                 CookieSession::signed(&[0; 32]) // TODO: signing key
                     .secure(false),
             )
+            .route("/", web::get().to(|| ""))
             .configure(user::config)
             .configure(document::config)
     })
