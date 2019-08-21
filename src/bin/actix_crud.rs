@@ -1,6 +1,7 @@
 use actix_crud::{db, document, user};
 use actix_session::CookieSession;
 use actix_web::{middleware, web, App, HttpServer};
+use actix_files::{Files};
 
 fn main() -> Result<(), failure::Error> {
     // enable logging with RUST_LOG=info
@@ -15,6 +16,7 @@ fn main() -> Result<(), failure::Error> {
                     .secure(false),
             )
             .route("/", web::get().to(|| ""))
+            .service(Files::new("/static", "static"))
             .configure(user::config)
             .configure(document::config)
     })

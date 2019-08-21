@@ -28,6 +28,14 @@ expected=' 200'
 result=$(curl -s -w ' %{http_code}' $base)
 assert
 
+# static folder
+echo -n "asdf" > static/file.txt
+description="serves static files"
+expected='asdf 200'
+result=$(curl -s -w ' %{http_code}' $base/static/file.txt)
+assert
+rm static/file.txt
+
 # Not logged in - all should fail
 description="unauthorized get"
 expected='unauthorized 401'

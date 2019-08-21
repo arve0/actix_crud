@@ -1,5 +1,4 @@
 - client side example
-- static files
 - builds
   - musl build for linux
   - mac

@@ -5,6 +5,7 @@ authors = ["Arve Seljebu <arve.seljebu@knowit.no>"]
 edition = "2018"
 
 [dependencies]
+actix-files="0.1"
 actix-service = "0.4"
 actix-session = "0.2"
 actix-web = "1.0"

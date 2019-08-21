@@ -9,7 +9,7 @@ cargo run --release
 curl localhost:8080
 ```
 
-See [test.sh](test.sh) for how to:
+Static files are served from `./static`. See [test.sh](test.sh) for how to:
 
 - register users
 - login
