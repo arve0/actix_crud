@@ -5,8 +5,8 @@
 use actix_crud::{db, document, user};
 use actix_session::CookieSession;
 use actix_web::dev::Service;
-use actix_web::{http, test, web, App};
 use actix_web::web::Bytes;
+use actix_web::{http, test, web, App};
 use criterion::{criterion_group, criterion_main, Criterion};
 
 criterion_group!(benches, http_benchmark);
@@ -47,7 +47,8 @@ fn http_benchmark(c: &mut Criterion) {
             .set_payload("username=a&password=1234")
             .to_request();
         let login_response = test::block_on(app.call(login_request)).unwrap();
-        let cookie = login_response.response()
+        let cookie = login_response
+            .response()
             .cookies()
             .find(|c| c.name() == "actix-session")
             .unwrap();
@@ -84,7 +85,8 @@ fn http_benchmark(c: &mut Criterion) {
             .set_payload("username=a&password=1234")
             .to_request();
         let login_response = test::block_on(app.call(login_request)).unwrap();
-        let cookie = login_response.response()
+        let cookie = login_response
+            .response()
             .cookies()
             .find(|c| c.name() == "actix-session")
             .unwrap();

@@ -1,7 +1,7 @@
 use actix_crud::{db, document, user};
+use actix_files::{Files, NamedFile};
 use actix_session::CookieSession;
 use actix_web::{middleware, web, App, HttpServer};
-use actix_files::{Files};
 
 fn main() -> Result<(), failure::Error> {
     // enable logging with RUST_LOG=info
@@ -15,8 +15,8 @@ fn main() -> Result<(), failure::Error> {
                 CookieSession::signed(&[0; 32]) // TODO: signing key
                     .secure(false),
             )
-            .route("/", web::get().to(|| ""))
-            .service(Files::new("/static", "static"))
+            .route("/", web::get().to(index))
+            .service(Files::new("/static", "client/public/static"))
             .configure(user::config)
             .configure(document::config)
     })
@@ -24,4 +24,8 @@ fn main() -> Result<(), failure::Error> {
 
     println!("Started http server: 127.0.0.1:8080");
     server.run().map_err(failure::Error::from)
+}
+
+fn index() -> Result<NamedFile, std::io::Error> {
+    NamedFile::open("client/public/index.html")
 }

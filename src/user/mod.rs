@@ -1,4 +1,4 @@
-use crate::db::{Pool, PooledConnection};
+use crate::db::{is_primary_key_constraint, Pool, PooledConnection};
 use crate::Error;
 use actix_session::Session;
 use actix_web::dev::Payload;
@@ -16,41 +16,82 @@ const PASSWORD_HASH_COST: u32 = 4;
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/user")
+            .route("", web::to(get_username))
             .route("/register", web::to(register))
             .route("/login", web::to(login))
             .route("/logout", web::to(logout)),
     );
 }
 
+fn get_username(user: AuthorizedUser) -> String {
+    user.username
+}
+
 fn register(
     user: web::Form<User>,
     login: UnauthorizedUser,
     pool: web::Data<Pool>,
+    req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
-    user.create(&db)?;
-    login.create_session(&user.username, &db)?;
-    Ok(HttpResponse::Created().body("user created"))
+    match user.create(&db) {
+        Ok(()) => {
+            login.create_session(&user.username, &db)?;
+
+            let referer = get_header(&req, "referer").unwrap_or_else(|| "/");
+            Ok(HttpResponse::SeeOther()
+                .header("location", referer)
+                .body("user registered"))
+        }
+        Err(error) => {
+            if is_primary_key_constraint(&error) {
+                Ok(HttpResponse::SeeOther()
+                    .header("content-type", "text/html")
+                    .body(r#"Unable to register user. <script>setTimeout(function () { history.back() }, 1000)</script>"#))
+            } else {
+                Err(Error::from(error))
+            }
+        }
+    }
+}
+
+fn get_header<'a>(req: &'a HttpRequest, key: &str) -> Option<&'a str> {
+    req.headers().get(key)?.to_str().ok()
 }
 
 fn login(
     user: web::Form<User>,
     login: UnauthorizedUser,
     pool: web::Data<Pool>,
-) -> Result<&'static str, Error> {
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let referer = get_header(&req, "referer").unwrap_or_else(|| "/");
+
     let db = pool.get()?;
     if user.verify_password(&db)? {
         login.create_session(&user.username, &db)?;
-        Ok("logged in")
+        Ok(HttpResponse::SeeOther()
+            .header("location", referer)
+            .body("logged in"))
     } else {
-        Err(Error(ErrorUnauthorized("wrong username or password")))
+        Ok(HttpResponse::Unauthorized()
+            .header("content-type", "text/html")
+            .body(r#"Wrong username or password. <script>setTimeout(function () { history.back() }, 1000)</script>"#))
     }
 }
 
-fn logout(login: AuthorizedUser, pool: web::Data<Pool>) -> Result<&'static str, Error> {
+fn logout(
+    login: AuthorizedUser,
+    pool: web::Data<Pool>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
     login.delete_session(&db)?;
-    Ok("logged out")
+
+    let referer = get_header(&req, "referer").unwrap_or_else(|| "/");
+    Ok(HttpResponse::SeeOther()
+        .header("location", referer)
+        .body("logged out"))
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -67,12 +108,12 @@ impl User {
         })
     }
 
-    fn create(&self, db: &PooledConnection) -> Result<(), Error> {
+    fn create(&self, db: &PooledConnection) -> Result<(), SqliteError> {
         let number_of_rows = db
             .prepare_cached(include_str!("insert.sql"))?
             .execute_named(named_params! {
                 ":username": self.username,
-                ":password": hash(&self.password, PASSWORD_HASH_COST)?,
+                ":password": hash(&self.password, PASSWORD_HASH_COST).unwrap(),
             })?;
 
         assert!(number_of_rows == 1);

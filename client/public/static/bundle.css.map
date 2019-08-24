@@ -1,0 +1,12 @@
+{
+  "version": 3,
+  "file": "bundle.css",
+  "sources": [
+    "../../src/App.svelte"
+  ],
+  "sourcesContent": [
+    "<script>\n    import Login from './Login.svelte'\n</script>\n\n<style>\n    h1 {\n        color: purple;\n    }\n</style>\n\n<header>\n    <Login></Login>\n</header>\n<main>\n    <h1>Hello!</h1>\n</main>\n"
+  ],
+  "names": [],
+  "mappings": "AAKI,EAAE,cAAC,CAAC,AACA,KAAK,CAAE,MAAM,AACjB,CAAC"
+}
