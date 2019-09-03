@@ -4,6 +4,7 @@ use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, 
 use rusqlite::{named_params, Error as SqliteError, Row};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::value::RawValue;
+use uuid::Uuid;
 
 use crate::db::{Pool, PooledConnection};
 use crate::user::AuthorizedUser;
@@ -11,18 +12,45 @@ use crate::Error;
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
-        web::scope("")
+        web::scope("/document")
+            .service(
+                web::resource("")
+                    .route(web::post().to(insert))
+                    .route(web::get().to(get_all))
+            )
             .service(
                 web::resource("/{id}")
                     .route(web::get().to(get))
-                    .route(web::delete().to(delete)),
+                    .route(web::delete().to(delete))
+                    .route(web::put().to(update))
             )
-            .service(
-                web::resource("/")
-                    .route(web::post().to(insert))
-                    .route(web::put().to(update)),
-            ),
     );
+}
+
+fn insert(
+    document: web::Json<JSON>,
+    login: AuthorizedUser,
+    pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let db = pool.get()?;
+    let entry = DBEntry::new(document.into_inner(), login);
+    entry.insert(db)?;
+
+    Ok(HttpResponse::Created().body(entry.id))
+}
+
+fn get_all(
+    login: AuthorizedUser,
+    pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let db = pool.get()?;
+    let entries =
+        DBEntry::get_all(&login.username, db).map_err(|err| match err {
+            SqliteError::QueryReturnedNoRows => ErrorNotFound("not found"),
+            err => ErrorInternalServerError(err),
+        })?;
+
+    Ok(HttpResponse::Ok().json(entries))
 }
 
 fn get(
@@ -40,26 +68,23 @@ fn get(
     Ok(HttpResponse::Ok().json(entry))
 }
 
-fn insert(
-    document: web::Json<Document>,
-    login: AuthorizedUser,
-    pool: web::Data<Pool>,
-) -> Result<HttpResponse, Error> {
-    let db = pool.get()?;
-    DBEntry::new(document.into_inner(), login).insert(db)?;
-
-    Ok(HttpResponse::Created().body("created"))
-}
-
 fn update(
-    document: web::Json<Document>,
+    id: web::Path<String>,
+    document: web::Json<JSON>,
     login: AuthorizedUser,
     pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
-    DBEntry::new(document.into_inner(), login).update(db)?;
 
-    Ok(HttpResponse::Ok().body("updated"))
+    let id = id.into_inner();
+    let username = login.username;
+
+    if DBEntry::exists(&id, &username, &db)? {
+        DBEntry::update(&id, &username, document.into_inner(), db)?;
+        Ok(HttpResponse::Ok().body("updated"))
+    } else {
+        Err(ErrorNotFound([&id, " not found"].concat()))?
+    }
 }
 
 fn delete(
@@ -101,12 +126,21 @@ struct DBEntry {
 }
 
 impl DBEntry {
-    pub fn new(document: Document, login: AuthorizedUser) -> Self {
+    pub fn new(document: JSON, login: AuthorizedUser) -> Self {
         Self {
-            id: document.id,
+            id: format!("{}", Uuid::new_v4()),
             username: login.username,
-            data: document.data,
+            data: document,
         }
+    }
+
+    pub fn get_all(username: &str, db: PooledConnection) -> DBResult<Vec<Document>> {
+        db.prepare_cached("select id, data from documents where username = :username")?
+            .query_map_named(
+                named_params! { ":username": username, },
+                Document::from_row
+            )?
+            .collect()
     }
 
     pub fn get_by_id(id: String, username: &str, db: PooledConnection) -> DBResult<Document> {
@@ -133,28 +167,24 @@ impl DBEntry {
         Ok(())
     }
 
-    pub fn update(&self, db: PooledConnection) -> DBResult<()> {
-        if self.exists(&db)? {
-            let number_of_rows = db
-                .prepare_cached(include_str!("update.sql"))?
-                .execute_named(named_params! {
-                    ":id": self.id,
-                    ":username": self.username,
-                    ":data": self.data,
-                })?;
-            assert!(number_of_rows == 1);
-            Ok(())
-        } else {
-            self.insert(db)
-        }
+    pub fn update(id: &str, username: &str, data: JSON, db: PooledConnection) -> DBResult<()> {
+        let number_of_rows = db
+            .prepare_cached(include_str!("update.sql"))?
+            .execute_named(named_params! {
+                ":id": &id,
+                ":username": &username,
+                ":data": data,
+            })?;
+        assert!(number_of_rows == 1);
+        Ok(())
     }
 
-    fn exists(&self, db: &PooledConnection) -> DBResult<bool> {
+    fn exists(id: &str, username: &str, db: &PooledConnection) -> DBResult<bool> {
         db.prepare_cached(include_str!("count_by_id.sql"))?
             .query_row_named(
                 named_params! {
-                    ":id": self.id,
-                    ":username": self.username,
+                    ":id": id,
+                    ":username": username,
                 },
                 |row| row.get(0),
             )

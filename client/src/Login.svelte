@@ -1,44 +1,26 @@
 <script>
-    let user = fetch('/user').then(r => {
-        if (r.status !== 200) {
-            throw new Error(`Got ${r.statusText} (${r.status}), body: ${r.body}`);
-        }
-        return r.text();
-    });
-
-    let register = false;
-    let login = false;
-
-    function loginDialog() {
-        register = false;
-        login = true;
-    }
-
-    function registerDialog() {
-        login = false;
-        register = true;
-    }
+    export let type = 'login';
+    let prettyType = type[0].toUpperCase() + type.slice(1);
 </script>
 
-{#await user then username}
-    <span>Logged in as {username}.</span> <a href="/user/logout">Logout</a>
-{:catch}
-    <a on:click={loginDialog}>Log in</a>
-    <a on:click={registerDialog}>Register</a>
+<div class="hero">
+    <div class="hero-body">
+        <form action="/user/{type}" method="POST">
+            <h1 class="title">{prettyType}</h1>
 
-    {#if login}
-        <form action="/user/login" method="POST">
-            <label>Username <input name=username></label>
-            <label>Password <input name=password type=password></label>
-            <button type=submit>Login</button>
-        </form>
-    {/if}
+            <label for=username>Username</label>
+            <input id=username name=username>
 
-    {#if register}
-        <form action="/user/register" method="POST">
-            <label>Username <input name=username></label>
-            <label>Password <input name=password type=password></label>
-            <button type=submit>Register</button>
+            <label for=password>Password</label>
+            <input id=password name=password type=password>
+
+            <button type=submit class=button>{prettyType}</button>
         </form>
-    {/if}
-{/await}
+    </div>
+</div>
+
+<style>
+    label, button {
+        display: block;
+    }
+</style>
