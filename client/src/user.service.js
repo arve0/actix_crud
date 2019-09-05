@@ -15,3 +15,5 @@ export const username = readable(null, set => {
 export const loggedIn = readable(false, set => {
     _username.then(u => u !== null).then(set);
 });
+
+export const loggedInPromise = _username.then(u => u !== null);
