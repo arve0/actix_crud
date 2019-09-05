@@ -33,6 +33,12 @@ fn register(
     pool: web::Data<Pool>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
+    if user.username.is_empty() {
+        Err(ErrorBadRequest("empty username"))?
+    } else if user.password.is_empty() {
+        Err(ErrorBadRequest("empty password"))?
+    }
+
     let db = pool.get()?;
     match user.create(&db) {
         Ok(()) => {

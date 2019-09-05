@@ -54,6 +54,17 @@ description="unauthorized delete"
 result=$(curl -s -w ' %{http_code}' -b cookies -c cookies -X DELETE $base/document/12345)
 assert
 
+# username and passwords not allowed
+description="register with empty username"
+expected="empty username 400"
+result=$(curl -s -w ' %{http_code}' -b cookies -c cookies -d 'username=&password=1' $base/user/register)
+assert
+
+description="register with empty password"
+expected="empty password 400"
+result=$(curl -s -w ' %{http_code}' -b cookies -c cookies -d 'username=a&password=' $base/user/register)
+assert
+
 # Registered and logged in
 description="register user"
 expected="user registered 303"
