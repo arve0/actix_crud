@@ -17,19 +17,19 @@
     }
 </script>
 
-<header class=navbar>
-    <div class=navbar-brand>
-        <span class=navbar-item>actix crud</span>
+<header>
+    <div class=brand>
+        <a href="/">actix crud</a>
     </div>
-    <div class=navbar-end>
-        <div class=navbar-item>
-            {#if $loggedIn}
-                <a href="/user/logout" class=button>Logout ({$username})</a>
-            {:else}
-                <button class=button on:click={showLoginDialog}>Log in</button>
-                <button class=button on:click={showRegisterDialog}>Register</button>
-            {/if}
-        </div>
+    <div class=menu></div>
+    <div class=login>
+        {#if $loggedIn}
+            <a class=button href="/user/logout">Logout ({$username})</a>
+        {:else if showRegister}
+            <button on:click={showLoginDialog}>Log in</button>
+        {:else if showLogin}
+            <button on:click={showRegisterDialog}>Register</button>
+        {/if}
     </div>
 </header>
 
@@ -46,9 +46,20 @@
 <style>
     header {
         background-color: aquamarine;
-        /* padding: 1em; */
+        padding: 1em;
+        display: grid;
+        grid-template-columns: max-content auto max-content;
+    }
+    header .brand {
+        align-self: center;
+    }
+    header .login > * {
+        margin: 0;
     }
     main {
-        margin-top: 2em;
+        margin-top: 4em;
+        margin-left: 2em;
+        margin-right: 2em;
+        margin-bottom: 1em;
     }
 </style>

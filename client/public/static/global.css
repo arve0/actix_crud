@@ -27,7 +27,7 @@ a:visited {
 	color: rgb(0,80,160);
 }
 
-input, button, select, textarea {
+input, button, select, textarea, a.button {
 	font-family: inherit;
 	font-size: inherit;
 	padding: 0.4em;
@@ -45,16 +45,22 @@ input[type="range"] {
 	height: 0;
 }
 
-button {
+button, a.button {
 	color: #333;
 	background-color: #f4f4f4;
 	outline: none;
 }
 
-button:active {
+button:active, a.button:active {
 	background-color: #ddd;
 }
 
-button:focus {
+button:focus, a.button:focus {
 	border-color: #666;
+}
+
+a.button {
+	display: inline-block;
+	text-decoration: none;
+	cursor: default;
 }

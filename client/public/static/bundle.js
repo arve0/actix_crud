@@ -55,6 +55,9 @@ var app = (function () {
     function space() {
         return text(' ');
     }
+    function empty() {
+        return text('');
+    }
     function listen(node, event, handler, options) {
         node.addEventListener(event, handler, options);
         return () => node.removeEventListener(event, handler, options);
@@ -404,16 +407,14 @@ var app = (function () {
     const file = "src/Login.svelte";
 
     function create_fragment(ctx) {
-    	var div1, div0, form, h1, t0, t1, label0, t3, input0, t4, label1, t6, input1, t7, button, t8, form_action_value;
+    	var h1, t0, t1, form, label0, t3, input0, t4, label1, t6, input1, t7, button, t8, form_action_value;
 
     	return {
     		c: function create() {
-    			div1 = element("div");
-    			div0 = element("div");
-    			form = element("form");
     			h1 = element("h1");
     			t0 = text(ctx.prettyType);
     			t1 = space();
+    			form = element("form");
     			label0 = element("label");
     			label0.textContent = "Username";
     			t3 = space();
@@ -426,31 +427,26 @@ var app = (function () {
     			t7 = space();
     			button = element("button");
     			t8 = text(ctx.prettyType);
-    			attr(h1, "class", "title");
-    			add_location(h1, file, 8, 12, 221);
+    			add_location(h1, file, 5, 0, 111);
     			attr(label0, "for", "username");
     			attr(label0, "class", "svelte-d00odx");
-    			add_location(label0, file, 10, 12, 270);
+    			add_location(label0, file, 8, 4, 181);
     			attr(input0, "id", "username");
     			attr(input0, "name", "username");
-    			add_location(input0, file, 11, 12, 319);
+    			add_location(input0, file, 9, 4, 222);
     			attr(label1, "for", "password");
     			attr(label1, "class", "svelte-d00odx");
-    			add_location(label1, file, 13, 12, 366);
+    			add_location(label1, file, 11, 4, 261);
     			attr(input1, "id", "password");
     			attr(input1, "name", "password");
     			attr(input1, "type", "password");
-    			add_location(input1, file, 14, 12, 415);
+    			add_location(input1, file, 12, 4, 302);
     			attr(button, "type", "submit");
     			attr(button, "class", "button svelte-d00odx");
-    			add_location(button, file, 16, 12, 476);
+    			add_location(button, file, 14, 4, 355);
     			attr(form, "action", form_action_value = "/user/" + ctx.type);
     			attr(form, "method", "POST");
-    			add_location(form, file, 7, 8, 166);
-    			attr(div0, "class", "hero-body");
-    			add_location(div0, file, 6, 4, 134);
-    			attr(div1, "class", "hero");
-    			add_location(div1, file, 5, 0, 111);
+    			add_location(form, file, 6, 0, 133);
     		},
 
     		l: function claim(nodes) {
@@ -458,12 +454,10 @@ var app = (function () {
     		},
 
     		m: function mount(target, anchor) {
-    			insert(target, div1, anchor);
-    			append(div1, div0);
-    			append(div0, form);
-    			append(form, h1);
+    			insert(target, h1, anchor);
     			append(h1, t0);
-    			append(form, t1);
+    			insert(target, t1, anchor);
+    			insert(target, form, anchor);
     			append(form, label0);
     			append(form, t3);
     			append(form, input0);
@@ -487,7 +481,9 @@ var app = (function () {
 
     		d: function destroy(detaching) {
     			if (detaching) {
-    				detach(div1);
+    				detach(h1);
+    				detach(t1);
+    				detach(form);
     			}
     		}
     	};
@@ -921,7 +917,7 @@ var app = (function () {
     	return child_ctx;
     }
 
-    // (40:0) {#if $documents.length}
+    // (38:0) {#if $documents.length}
     function create_if_block_1(ctx) {
     	var table, thead, tr, th0, t1, th1, t3, th2, t5, th3, t7, th4, t9, each_blocks = [], each_1_lookup = new Map();
 
@@ -957,15 +953,20 @@ var app = (function () {
     			t9 = space();
 
     			for (i = 0; i < each_blocks.length; i += 1) each_blocks[i].c();
-    			add_location(th0, file$2, 44, 20, 1020);
-    			add_location(th1, file$2, 45, 20, 1054);
-    			add_location(th2, file$2, 46, 20, 1095);
-    			add_location(th3, file$2, 47, 20, 1131);
-    			add_location(th4, file$2, 48, 20, 1165);
-    			add_location(tr, file$2, 42, 16, 954);
-    			add_location(thead, file$2, 41, 12, 930);
-    			attr(table, "class", "table");
-    			add_location(table, file$2, 40, 8, 898);
+    			attr(th0, "class", "svelte-1fv41r1");
+    			add_location(th0, file$2, 42, 16, 931);
+    			attr(th1, "class", "svelte-1fv41r1");
+    			add_location(th1, file$2, 43, 16, 961);
+    			attr(th2, "class", "svelte-1fv41r1");
+    			add_location(th2, file$2, 44, 16, 998);
+    			attr(th3, "class", "svelte-1fv41r1");
+    			add_location(th3, file$2, 45, 16, 1030);
+    			attr(th4, "class", "svelte-1fv41r1");
+    			add_location(th4, file$2, 46, 16, 1060);
+    			add_location(tr, file$2, 40, 12, 873);
+    			add_location(thead, file$2, 39, 8, 853);
+    			attr(table, "class", "table svelte-1fv41r1");
+    			add_location(table, file$2, 38, 4, 825);
     		},
 
     		m: function mount(target, anchor) {
@@ -1001,7 +1002,7 @@ var app = (function () {
     	};
     }
 
-    // (52:8) {#each $documents as doc (doc.id)}
+    // (50:4) {#each $documents as doc (doc.id)}
     function create_each_block(key_1, ctx) {
     	var tr, td0, t0_value = ctx.doc.data.date + "", t0, t1, td1, t2_value = ctx.doc.data.description + "", t2, t3, td2, t4_value = ctx.doc.data.amount + "", t4, t5, td3, t6_value = ctx.doc.data.done ? "✅" : "❌" + "", t6, t7, td4, button0, t9, button1, t11, dispose;
 
@@ -1039,14 +1040,21 @@ var app = (function () {
     			button1 = element("button");
     			button1.textContent = "Delete";
     			t11 = space();
-    			add_location(td0, file$2, 54, 16, 1344);
-    			add_location(td1, file$2, 55, 16, 1385);
-    			add_location(td2, file$2, 56, 16, 1433);
-    			add_location(td3, file$2, 57, 16, 1476);
-    			add_location(button0, file$2, 59, 20, 1554);
-    			add_location(button1, file$2, 60, 20, 1623);
-    			add_location(td4, file$2, 58, 16, 1529);
-    			add_location(tr, file$2, 52, 12, 1280);
+    			attr(td0, "class", "svelte-1fv41r1");
+    			add_location(td0, file$2, 52, 12, 1215);
+    			attr(td1, "class", "svelte-1fv41r1");
+    			add_location(td1, file$2, 53, 12, 1252);
+    			attr(td2, "class", "svelte-1fv41r1");
+    			add_location(td2, file$2, 54, 12, 1296);
+    			attr(td3, "class", "svelte-1fv41r1");
+    			add_location(td3, file$2, 55, 12, 1335);
+    			attr(button0, "class", "svelte-1fv41r1");
+    			add_location(button0, file$2, 57, 16, 1405);
+    			attr(button1, "class", "svelte-1fv41r1");
+    			add_location(button1, file$2, 58, 16, 1470);
+    			attr(td4, "class", "svelte-1fv41r1");
+    			add_location(td4, file$2, 56, 12, 1384);
+    			add_location(tr, file$2, 50, 8, 1159);
 
     			dispose = [
     				listen(button0, "click", click_handler),
@@ -1106,7 +1114,7 @@ var app = (function () {
     	};
     }
 
-    // (72:8) {:else}
+    // (70:4) {:else}
     function create_else_block(ctx) {
     	var button, dispose;
 
@@ -1114,7 +1122,7 @@ var app = (function () {
     		c: function create_1() {
     			button = element("button");
     			button.textContent = "Create new document";
-    			add_location(button, file$2, 72, 8, 1902);
+    			add_location(button, file$2, 70, 4, 1701);
     			dispose = listen(button, "click", ctx.create);
     		},
 
@@ -1136,7 +1144,7 @@ var app = (function () {
     	};
     }
 
-    // (67:8) {#if show_input_form}
+    // (65:4) {#if show_input_form}
     function create_if_block(ctx) {
     	var current;
 
@@ -1181,7 +1189,7 @@ var app = (function () {
     }
 
     function create_fragment$2(ctx) {
-    	var div1, div0, h1, t1, t2, current_block_type_index, if_block1, current;
+    	var h1, t1, t2, current_block_type_index, if_block1, if_block1_anchor, current;
 
     	var if_block0 = (ctx.$documents.length) && create_if_block_1(ctx);
 
@@ -1202,20 +1210,14 @@ var app = (function () {
 
     	return {
     		c: function create_1() {
-    			div1 = element("div");
-    			div0 = element("div");
     			h1 = element("h1");
     			h1.textContent = "Documents";
     			t1 = space();
     			if (if_block0) if_block0.c();
     			t2 = space();
     			if_block1.c();
-    			attr(h1, "class", "title");
-    			add_location(h1, file$2, 38, 8, 833);
-    			attr(div0, "class", "hero-body");
-    			add_location(div0, file$2, 37, 4, 801);
-    			attr(div1, "class", "hero");
-    			add_location(div1, file$2, 36, 0, 778);
+    			if_block1_anchor = empty();
+    			add_location(h1, file$2, 36, 0, 778);
     		},
 
     		l: function claim(nodes) {
@@ -1223,13 +1225,12 @@ var app = (function () {
     		},
 
     		m: function mount(target, anchor) {
-    			insert(target, div1, anchor);
-    			append(div1, div0);
-    			append(div0, h1);
-    			append(div0, t1);
-    			if (if_block0) if_block0.m(div0, null);
-    			append(div0, t2);
-    			if_blocks[current_block_type_index].m(div0, null);
+    			insert(target, h1, anchor);
+    			insert(target, t1, anchor);
+    			if (if_block0) if_block0.m(target, anchor);
+    			insert(target, t2, anchor);
+    			if_blocks[current_block_type_index].m(target, anchor);
+    			insert(target, if_block1_anchor, anchor);
     			current = true;
     		},
 
@@ -1240,7 +1241,7 @@ var app = (function () {
     				} else {
     					if_block0 = create_if_block_1(ctx);
     					if_block0.c();
-    					if_block0.m(div0, t2);
+    					if_block0.m(t2.parentNode, t2);
     				}
     			} else if (if_block0) {
     				if_block0.d(1);
@@ -1264,7 +1265,7 @@ var app = (function () {
     					if_block1.c();
     				}
     				transition_in(if_block1, 1);
-    				if_block1.m(div0, null);
+    				if_block1.m(if_block1_anchor.parentNode, if_block1_anchor);
     			}
     		},
 
@@ -1281,11 +1282,21 @@ var app = (function () {
 
     		d: function destroy(detaching) {
     			if (detaching) {
-    				detach(div1);
+    				detach(h1);
+    				detach(t1);
     			}
 
-    			if (if_block0) if_block0.d();
-    			if_blocks[current_block_type_index].d();
+    			if (if_block0) if_block0.d(detaching);
+
+    			if (detaching) {
+    				detach(t2);
+    			}
+
+    			if_blocks[current_block_type_index].d(detaching);
+
+    			if (detaching) {
+    				detach(if_block1_anchor);
+    			}
     		}
     	};
     }
@@ -1377,49 +1388,65 @@ var app = (function () {
 
     const file$3 = "src/App.svelte";
 
-    // (28:12) {:else}
-    function create_else_block$1(ctx) {
-    	var button0, t_1, button1, dispose;
+    // (30:28) 
+    function create_if_block_5(ctx) {
+    	var button, dispose;
 
     	return {
     		c: function create() {
-    			button0 = element("button");
-    			button0.textContent = "Log in";
-    			t_1 = space();
-    			button1 = element("button");
-    			button1.textContent = "Register";
-    			attr(button0, "class", "button");
-    			add_location(button0, file$3, 28, 16, 728);
-    			attr(button1, "class", "button");
-    			add_location(button1, file$3, 29, 16, 808);
-
-    			dispose = [
-    				listen(button0, "click", ctx.showLoginDialog),
-    				listen(button1, "click", ctx.showRegisterDialog)
-    			];
+    			button = element("button");
+    			button.textContent = "Register";
+    			attr(button, "class", "svelte-104w8eq");
+    			add_location(button, file$3, 30, 12, 775);
+    			dispose = listen(button, "click", ctx.showRegisterDialog);
     		},
 
     		m: function mount(target, anchor) {
-    			insert(target, button0, anchor);
-    			insert(target, t_1, anchor);
-    			insert(target, button1, anchor);
+    			insert(target, button, anchor);
     		},
 
     		p: noop,
 
     		d: function destroy(detaching) {
     			if (detaching) {
-    				detach(button0);
-    				detach(t_1);
-    				detach(button1);
+    				detach(button);
     			}
 
-    			run_all(dispose);
+    			dispose();
     		}
     	};
     }
 
-    // (26:12) {#if $loggedIn}
+    // (28:31) 
+    function create_if_block_4(ctx) {
+    	var button, dispose;
+
+    	return {
+    		c: function create() {
+    			button = element("button");
+    			button.textContent = "Log in";
+    			attr(button, "class", "svelte-104w8eq");
+    			add_location(button, file$3, 28, 12, 683);
+    			dispose = listen(button, "click", ctx.showLoginDialog);
+    		},
+
+    		m: function mount(target, anchor) {
+    			insert(target, button, anchor);
+    		},
+
+    		p: noop,
+
+    		d: function destroy(detaching) {
+    			if (detaching) {
+    				detach(button);
+    			}
+
+    			dispose();
+    		}
+    	};
+    }
+
+    // (26:8) {#if $loggedIn}
     function create_if_block_3(ctx) {
     	var a, t0, t1, t2;
 
@@ -1429,9 +1456,9 @@ var app = (function () {
     			t0 = text("Logout (");
     			t1 = text(ctx.$username);
     			t2 = text(")");
+    			attr(a, "class", "button svelte-104w8eq");
     			attr(a, "href", "/user/logout");
-    			attr(a, "class", "button");
-    			add_location(a, file$3, 26, 16, 631);
+    			add_location(a, file$3, 26, 12, 578);
     		},
 
     		m: function mount(target, anchor) {
@@ -1561,15 +1588,16 @@ var app = (function () {
     }
 
     function create_fragment$3(ctx) {
-    	var header, div0, span, t1, div2, div1, t2, main, current_block_type_index, if_block1, current;
+    	var header, div0, a, t1, div1, t2, div2, t3, main, current_block_type_index, if_block1, current;
 
     	function select_block_type(changed, ctx) {
     		if (ctx.$loggedIn) return create_if_block_3;
-    		return create_else_block$1;
+    		if (ctx.showRegister) return create_if_block_4;
+    		if (ctx.showLogin) return create_if_block_5;
     	}
 
     	var current_block_type = select_block_type(null, ctx);
-    	var if_block0 = current_block_type(ctx);
+    	var if_block0 = current_block_type && current_block_type(ctx);
 
     	var if_block_creators = [
     		create_if_block$1,
@@ -1594,27 +1622,28 @@ var app = (function () {
     		c: function create() {
     			header = element("header");
     			div0 = element("div");
-    			span = element("span");
-    			span.textContent = "actix crud";
+    			a = element("a");
+    			a.textContent = "actix crud";
     			t1 = space();
-    			div2 = element("div");
     			div1 = element("div");
-    			if_block0.c();
     			t2 = space();
+    			div2 = element("div");
+    			if (if_block0) if_block0.c();
+    			t3 = space();
     			main = element("main");
     			if (if_block1) if_block1.c();
-    			attr(span, "class", "navbar-item");
-    			add_location(span, file$3, 21, 8, 475);
-    			attr(div0, "class", "navbar-brand");
-    			add_location(div0, file$3, 20, 4, 442);
-    			attr(div1, "class", "navbar-item");
-    			add_location(div1, file$3, 24, 8, 563);
-    			attr(div2, "class", "navbar-end");
-    			add_location(div2, file$3, 23, 4, 532);
-    			attr(header, "class", "navbar svelte-2gz7vs");
+    			attr(a, "href", "/");
+    			add_location(a, file$3, 21, 8, 455);
+    			attr(div0, "class", "brand svelte-104w8eq");
+    			add_location(div0, file$3, 20, 4, 429);
+    			attr(div1, "class", "menu");
+    			add_location(div1, file$3, 23, 4, 497);
+    			attr(div2, "class", "login");
+    			add_location(div2, file$3, 24, 4, 524);
+    			attr(header, "class", "svelte-104w8eq");
     			add_location(header, file$3, 19, 0, 416);
-    			attr(main, "class", "svelte-2gz7vs");
-    			add_location(main, file$3, 35, 0, 932);
+    			attr(main, "class", "svelte-104w8eq");
+    			add_location(main, file$3, 35, 0, 867);
     		},
 
     		l: function claim(nodes) {
@@ -1624,12 +1653,13 @@ var app = (function () {
     		m: function mount(target, anchor) {
     			insert(target, header, anchor);
     			append(header, div0);
-    			append(div0, span);
+    			append(div0, a);
     			append(header, t1);
+    			append(header, div1);
+    			append(header, t2);
     			append(header, div2);
-    			append(div2, div1);
-    			if_block0.m(div1, null);
-    			insert(target, t2, anchor);
+    			if (if_block0) if_block0.m(div2, null);
+    			insert(target, t3, anchor);
     			insert(target, main, anchor);
     			if (~current_block_type_index) if_blocks[current_block_type_index].m(main, null);
     			current = true;
@@ -1639,11 +1669,11 @@ var app = (function () {
     			if (current_block_type === (current_block_type = select_block_type(changed, ctx)) && if_block0) {
     				if_block0.p(changed, ctx);
     			} else {
-    				if_block0.d(1);
-    				if_block0 = current_block_type(ctx);
+    				if (if_block0) if_block0.d(1);
+    				if_block0 = current_block_type && current_block_type(ctx);
     				if (if_block0) {
     					if_block0.c();
-    					if_block0.m(div1, null);
+    					if_block0.m(div2, null);
     				}
     			}
 
@@ -1688,10 +1718,10 @@ var app = (function () {
     				detach(header);
     			}
 
-    			if_block0.d();
+    			if (if_block0) if_block0.d();
 
     			if (detaching) {
-    				detach(t2);
+    				detach(t3);
     				detach(main);
     			}
 
