@@ -6,6 +6,7 @@ use actix_web::{middleware, web, App, HttpServer};
 fn main() -> Result<(), failure::Error> {
     // enable logging with RUST_LOG=info
     env_logger::init();
+    let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
 
     let server = HttpServer::new(move || {
         App::new()
@@ -20,9 +21,9 @@ fn main() -> Result<(), failure::Error> {
             .configure(user::config)
             .configure(document::config)
     })
-    .bind("127.0.0.1:8080")?;
+    .bind(["0.0.0.0:", &port].concat())?;
 
-    println!("Started http server: 127.0.0.1:8080");
+    println!("Listening on port {}", &port);
     server.run().map_err(failure::Error::from)
 }
 
