@@ -135,7 +135,7 @@ impl DBEntry {
     }
 
     pub fn get_all(username: &str, db: PooledConnection) -> DBResult<Vec<Document>> {
-        db.prepare_cached("select id, data from documents where username = :username")?
+        db.prepare_cached("select id, data from document where username = :username")?
             .query_map_named(
                 named_params! { ":username": username, },
                 Document::from_row
@@ -144,7 +144,7 @@ impl DBEntry {
     }
 
     pub fn get_by_id(id: String, username: &str, db: PooledConnection) -> DBResult<Document> {
-        db.prepare_cached(include_str!("get_by_id.sql"))?
+        db.prepare_cached("select id, data from document where id=:id and username=:username")?
             .query_row_named(
                 named_params! {
                     ":id": &id,
@@ -156,7 +156,7 @@ impl DBEntry {
 
     pub fn insert(&self, db: PooledConnection) -> DBResult<()> {
         let number_of_rows = db
-            .prepare_cached(include_str!("insert.sql"))?
+            .prepare_cached("insert into document (id, username, data) values (:id, :username, :data)")?
             .execute_named(named_params! {
                 ":id": self.id,
                 ":username": self.username,
@@ -169,7 +169,7 @@ impl DBEntry {
 
     pub fn update(id: &str, username: &str, data: JSON, db: PooledConnection) -> DBResult<()> {
         let number_of_rows = db
-            .prepare_cached(include_str!("update.sql"))?
+            .prepare_cached("update document set data=:data where id=:id and username=:username")?
             .execute_named(named_params! {
                 ":id": &id,
                 ":username": &username,
@@ -180,7 +180,7 @@ impl DBEntry {
     }
 
     fn exists(id: &str, username: &str, db: &PooledConnection) -> DBResult<bool> {
-        db.prepare_cached(include_str!("count_by_id.sql"))?
+        db.prepare_cached("select count(*) from document where id=:id and username=:username")?
             .query_row_named(
                 named_params! {
                     ":id": id,
@@ -192,7 +192,7 @@ impl DBEntry {
     }
 
     pub fn delete(id: String, username: &str, db: PooledConnection) -> DBResult<bool> {
-        db.prepare_cached(include_str!("delete_by_id.sql"))?
+        db.prepare_cached("delete from document where id=:id and username=:username")?
             .execute_named(named_params! {
                 ":id": id,
                 ":username": username,

@@ -116,7 +116,7 @@ impl User {
 
     fn create(&self, db: &PooledConnection) -> Result<(), SqliteError> {
         let number_of_rows = db
-            .prepare_cached(include_str!("insert.sql"))?
+            .prepare_cached("insert into user (username, password) values (:username, :password)")?
             .execute_named(named_params! {
                 ":username": self.username,
                 ":password": hash(&self.password, PASSWORD_HASH_COST).unwrap(),
@@ -127,7 +127,7 @@ impl User {
     }
 
     fn verify_password(&self, db: &PooledConnection) -> Result<bool, Error> {
-        db.prepare_cached(include_str!("get_by_username.sql"))?
+        db.prepare_cached("select username, password from user where username=?1")?
             .query_row(&[&self.username], Self::from_row)
             .map(|stored| verify(&self.password, &stored.password).unwrap_or_else(|_| false))
             .or_else(|_| Ok(false)) // query_row returned no rows
@@ -156,7 +156,7 @@ impl UnauthorizedUser {
     fn create_session(&self, username: &str, db: &PooledConnection) -> Result<(), Error> {
         let key = Uuid::new_v4();
         let number_of_rows = db
-            .prepare_cached(include_str!("insert_session.sql"))?
+            .prepare_cached("insert into user_session (key, username) values (:key, :username)")?
             .execute_named(named_params! {
                 ":key": key,
                 ":username": username,
@@ -190,7 +190,7 @@ impl FromRequest for AuthorizedUser {
             if let Some(pool) = req.app_data::<Pool>() {
                 let username = pool
                     .get()?
-                    .prepare_cached(include_str!("get_session_username.sql"))?
+                    .prepare_cached("select username from user_session where key=?")?
                     .query_row(&[&uuid], |row| row.get(0))
                     .map_err(|error| match error {
                         QueryReturnedNoRows => {
@@ -216,7 +216,7 @@ impl FromRequest for AuthorizedUser {
 
 impl AuthorizedUser {
     fn delete_session(&self, db: &PooledConnection) -> Result<(), Error> {
-        db.prepare_cached(include_str!("delete_session.sql"))?
+        db.prepare_cached("delete from user_session where key=:key")?
             .execute_named(named_params! {
                 ":key": self.uuid
             })?;

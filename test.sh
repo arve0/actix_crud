@@ -18,9 +18,9 @@ assert () {
 
 # clear database
 rm -f cookies
-sqlite3 database.sqlite "delete from documents"
-sqlite3 database.sqlite "delete from users"
-sqlite3 database.sqlite "delete from user_sessions"
+sqlite3 storage/database.sqlite "delete from document"
+sqlite3 storage/database.sqlite "delete from user"
+sqlite3 storage/database.sqlite "delete from user_session"
 
 # Index
 description="server is up"

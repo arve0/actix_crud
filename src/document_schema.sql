@@ -1,4 +1,4 @@
-create table documents (
+create table document (
     id text not null,
     username text not null,
     data text not null,

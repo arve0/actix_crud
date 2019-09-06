@@ -1,1 +1,0 @@
-delete from documents where id=:id and username=:username;
