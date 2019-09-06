@@ -14,8 +14,7 @@
   "scripts": {
     "build": "rollup -c",
     "autobuild": "rollup -c -w",
-    "dev": "run-p start:dev autobuild",
-    "start": "cd .. && cargo run --release",
-    "start:dev": "cd .. && cargo watch -w src -x run"
+    "start": "run-p start:backend autobuild",
+    "start:backend": "cd .. && cargo watch -w src -x run"
   }
 }
