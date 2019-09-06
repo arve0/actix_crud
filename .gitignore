@@ -1,5 +1,4 @@
 /target
 **/*.rs.bk
 bench.sqlite*
-database.sqlite*
 cookies

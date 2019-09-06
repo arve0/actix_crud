@@ -6,7 +6,7 @@ use std::path::Path;
 pub type Pool = r2d2::Pool<SqliteConnectionManager>;
 pub type PooledConnection = r2d2::PooledConnection<SqliteConnectionManager>;
 
-const DB_FILENAME: &str = "database.sqlite";
+const DB_FILENAME: &str = "storage/database.sqlite";
 
 pub fn get_pool() -> Pool {
     Pool::new(get_db_create_if_missing()).expect("Unable to create db pool.")
