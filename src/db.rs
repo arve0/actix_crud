@@ -27,6 +27,8 @@ fn create_db() {
         .expect("Failed to execute document schema.");
     db.execute_batch(include_str!("user_schema.sql"))
         .expect("Failed to execute user schema.");
+    db.execute_batch(include_str!("setting_schema.sql"))
+        .expect("Failed to execute setting schema.");
 
     enable_write_ahead_logging(&db);
 }
