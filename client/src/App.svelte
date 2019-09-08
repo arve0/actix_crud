@@ -58,8 +58,14 @@
     }
     main {
         margin-top: 4em;
-        margin-left: 2em;
-        margin-right: 2em;
+        margin-left: 0.5em;
+        margin-right: 0.5em;
         margin-bottom: 1em;
+    }
+    @media screen and (min-width: 768px) {
+        main {
+            margin-left: 2em;
+            margin-right: 2em;
+        }
     }
 </style>
