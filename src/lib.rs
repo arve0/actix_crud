@@ -6,8 +6,9 @@ use rusqlite::Error as SqliteError;
 
 pub mod db;
 pub mod document;
-pub mod user;
 pub mod setting;
+pub mod updates;
+pub mod user;
 
 /**
  * Wrap actix_web::Error inside our own error type, such

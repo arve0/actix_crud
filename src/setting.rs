@@ -1,6 +1,7 @@
-use crate::db::PooledConnection;
-use rusqlite::NO_PARAMS;
 use rand::{thread_rng, Rng};
+use rusqlite::NO_PARAMS;
+
+use crate::db::PooledConnection;
 
 pub fn get_or_create_cookie_session_key(db: &PooledConnection) -> Vec<u8> {
     db.prepare("select value from setting where name = 'cookie_session_key'")
@@ -13,7 +14,8 @@ fn create_cookie_session_key(db: &PooledConnection) -> Vec<u8> {
     let mut key = vec![0u8; 32];
     thread_rng().fill(&mut key[..]);
 
-    let rows = db.prepare("insert into setting values ( 'cookie_session_key', ?)")
+    let rows = db
+        .prepare("insert into setting values ( 'cookie_session_key', ?)")
         .unwrap()
         .execute(&[&key])
         .expect("Unable to insert cookie session key.");

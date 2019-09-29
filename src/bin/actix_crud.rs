@@ -1,8 +1,8 @@
-use actix_crud::{db, document, user, setting};
+use actix_crud::{db, document, setting, updates, user};
 use actix_files::{Files, NamedFile};
 use actix_session::CookieSession;
+use actix_web::cookie::SameSite;
 use actix_web::{middleware, web, App, HttpServer};
-use actix_web::cookie::{SameSite};
 
 fn main() -> Result<(), failure::Error> {
     // enable logging with RUST_LOG=info
@@ -12,9 +12,12 @@ fn main() -> Result<(), failure::Error> {
     let db_pool = db::get_pool();
     let cookie_session_key = setting::get_or_create_cookie_session_key(&db_pool.get()?);
 
+    let client_updates = updates::ClientUpdates::create();
+
     let server = HttpServer::new(move || {
         App::new()
             .data(db_pool.clone())
+            .register_data(client_updates.clone())
             .wrap(middleware::Logger::default())
             .wrap(
                 CookieSession::signed(&cookie_session_key)
@@ -26,6 +29,7 @@ fn main() -> Result<(), failure::Error> {
             .service(Files::new("/static", "client/public/static"))
             .configure(user::config)
             .configure(document::config)
+            .configure(updates::config)
     })
     .bind(["0.0.0.0:", &port].concat())?;
 
