@@ -3,6 +3,9 @@ An implementation of create, read, update and delete over HTTP with [actix-web](
 
 ![](actix_crud_web_client.png)
 
+## What is this good for?
+Making user oriented crud-applications with cross-client live updates.
+
 ## Running
 ```sh
 # start server
