@@ -1,5 +1,5 @@
 # actix crud
-An implementation of create, read, update and delete over HTTP with [actix-web](https://actix.rs), [SQLite](https://www.sqlite.org) and [svelte](https://svelte.dev). Live updates via [server sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events), also known as EventSource.
+An implementation of create, read, update and delete over HTTP with [actix-web](https://actix.rs), [SQLite](https://www.sqlite.org) and [svelte](https://svelte.dev). Live updates via [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events), also known as EventSource.
 
 ![](actix_crud_web_client.png)
 
