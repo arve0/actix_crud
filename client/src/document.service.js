@@ -30,7 +30,10 @@ async function create(data) {
         throw new Error(`HTTP status ${response.status}, message '${msg}'`);
     }
     let id = await response.text();
-    update(documents => [...documents, { id, data }])
+    let document = { id, data };
+    update(documents => [...documents, document])
+    // communicate with tabs
+    localStorage.setItem("insert", JSON.stringify(document))
 }
 
 async function delete_(id) {
@@ -53,6 +56,8 @@ async function delete_(id) {
             ...documents.slice(i + 1)
         ]
     })
+    // communicate with tabs
+    localStorage.setItem("delete", id)
 }
 
 async function put(document) {
@@ -81,27 +86,42 @@ async function put(document) {
             ...documents.slice(i + 1)
         ]
     })
+    // communicate with tabs
+    localStorage.setItem("update", JSON.stringify(document))
 }
 
 const updates = new EventSource("/updates")
-updates.addEventListener("insert", (event) => {
-    let document = JSON.parse(event.data);
-    update(documents => [...documents, document]);
+updates.addEventListener("insert", insertFromUpdates);
+updates.addEventListener("update", putFromUpdates);
+updates.addEventListener("delete", deleteFromUpdates);
+
+window.addEventListener('storage', function (event) {
+    if (event.key === "insert") {
+        insertFromUpdates({ data: event.newValue })
+    } else if (event.key === "update") {
+        putFromUpdates({ data: event.newValue })
+    } else if (event.key === "delete") {
+        deleteFromUpdates({ data: event.newValue })
+    }
 });
 
-updates.addEventListener("update", (event) => {
+function insertFromUpdates(event) {
+    let document = JSON.parse(event.data);
+    update(documents => [...documents, document]);
+}
+
+function putFromUpdates(event) {
     let document = JSON.parse(event.data);
     update(documents => documents.map(d =>
         d.id === document.id
             ? document
             : d
     ))
-});
+}
 
-updates.addEventListener("delete", (event) => {
+function deleteFromUpdates(event) {
     let id = event.data;
     update(documents => documents.filter(d => d.id !== id))
-});
-
+}
 
 export const documents = { create, delete_, subscribe, put };
