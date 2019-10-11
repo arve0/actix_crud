@@ -83,4 +83,25 @@ async function put(document) {
     })
 }
 
+const updates = new EventSource("/updates")
+updates.addEventListener("insert", (event) => {
+    let document = JSON.parse(event.data);
+    update(documents => [...documents, document]);
+});
+
+updates.addEventListener("update", (event) => {
+    let document = JSON.parse(event.data);
+    update(documents => documents.map(d =>
+        d.id === document.id
+            ? document
+            : d
+    ))
+});
+
+updates.addEventListener("delete", (event) => {
+    let id = event.data;
+    update(documents => documents.filter(d => d.id !== id))
+});
+
+
 export const documents = { create, delete_, subscribe, put };

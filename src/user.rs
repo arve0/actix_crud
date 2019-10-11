@@ -1,5 +1,3 @@
-use crate::db::{is_primary_key_constraint, Pool, PooledConnection};
-use crate::Error;
 use actix_session::Session;
 use actix_web::dev::Payload;
 use actix_web::error::{ErrorBadRequest, ErrorInternalServerError, ErrorUnauthorized};
@@ -10,6 +8,9 @@ use rusqlite::Error::QueryReturnedNoRows;
 use rusqlite::{named_params, Row};
 use serde_derive::{Deserialize, Serialize};
 use uuid::Uuid;
+
+use crate::db::{is_primary_key_constraint, Pool, PooledConnection};
+use crate::Error;
 
 const PASSWORD_HASH_COST: u32 = 4;
 
@@ -34,9 +35,9 @@ fn register(
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     if user.username.is_empty() {
-        Err(ErrorBadRequest("empty username"))?
+        return Err(ErrorBadRequest("empty username").into());
     } else if user.password.is_empty() {
-        Err(ErrorBadRequest("empty password"))?
+        return Err(ErrorBadRequest("empty password").into());
     }
 
     let db = pool.get()?;
@@ -172,7 +173,7 @@ impl UnauthorizedUser {
 pub struct AuthorizedUser {
     pub username: String,
     session: Session,
-    uuid: Uuid,
+    pub uuid: Uuid,
 }
 
 impl FromRequest for AuthorizedUser {
