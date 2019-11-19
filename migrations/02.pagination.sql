@@ -1,4 +1,6 @@
-create table document (
+-- add columns for sorting documents
+DROP TABLE document;
+CREATE TABLE document (
     id text not null,
     created number not null,
     updated number not null,

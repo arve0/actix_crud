@@ -1,5 +1,6 @@
 use actix_web::error::{ErrorInternalServerError, ErrorNotFound};
 use actix_web::{web, HttpResponse};
+use chrono::Utc;
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
 use rusqlite::{named_params, Error as SqliteError, Row};
 use serde_derive::{Deserialize, Serialize};
@@ -138,6 +139,7 @@ impl Document {
 
 struct DBEntry {
     id: String,
+    created: i64,
     username: String,
     data: JSON,
 }
@@ -146,14 +148,18 @@ impl DBEntry {
     pub fn new(document: JSON, login: &AuthorizedUser) -> Self {
         Self {
             id: format!("{}", Uuid::new_v4()),
+            created: Utc::now().timestamp(),
             username: login.username.clone(),
             data: document,
         }
     }
 
     pub fn get_all(username: &str, db: PooledConnection) -> DBResult<Vec<Document>> {
-        db.prepare_cached("select id, data from document where username = :username")?
-            .query_map_named(named_params! { ":username": username, }, Document::from_row)?
+        db.prepare_cached("select id, data from document where username = :username order by created desc limit 100")?
+            .query_map_named(
+                named_params! { ":username": username, },
+                Document::from_row
+            )?
             .collect()
     }
 
@@ -170,11 +176,11 @@ impl DBEntry {
 
     pub fn insert(&self, db: PooledConnection) -> DBResult<()> {
         let number_of_rows = db
-            .prepare_cached(
-                "insert into document (id, username, data) values (:id, :username, :data)",
-            )?
+            .prepare_cached("insert into document (id, created, updated, username, data) values (:id, :created, :updated, :username, :data)")?
             .execute_named(named_params! {
                 ":id": self.id,
+                ":created": self.created,
+                ":updated": self.created,
                 ":username": self.username,
                 ":data": self.data,
             })?;
@@ -185,9 +191,10 @@ impl DBEntry {
 
     pub fn update(id: &str, username: &str, data: &JSON, db: PooledConnection) -> DBResult<()> {
         let number_of_rows = db
-            .prepare_cached("update document set data=:data where id=:id and username=:username")?
+            .prepare_cached("update document set data=:data, updated=:updated where id=:id and username=:username")?
             .execute_named(named_params! {
                 ":id": &id,
+                ":updated": Utc::now().timestamp(),
                 ":username": &username,
                 ":data": data,
             })?;
