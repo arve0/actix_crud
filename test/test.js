@@ -1,7 +1,7 @@
 const fetch = require("node-fetch")
 const assert = require("assert")
 
-describe("documents sorted by date", function () {
+describe("documents", function () {
     before(async function () {
         await register_and_login()
 
@@ -12,6 +12,18 @@ describe("documents sorted by date", function () {
     it("should get 100 first documents", async function () {
         let documents = await get_documents()
         assert.equal(documents.length, 100)
+    })
+
+    it("should be sorted by date", async function () {
+        let documents = await get_documents()
+
+        assert.notEqual(documents[0].created, undefined);
+
+        let prev = documents[1];
+        for (let document of documents.slice(1)) {
+            assert(document.created <= prev.created);
+            prev = document;
+        }
     })
 })
 
@@ -44,6 +56,7 @@ async function register_and_login() {
 }
 
 async function create_document(i) {
+    await sleep(Math.random() * 1100); // different `created` values
     let result = await fetch(BASE_URL + "/document", {
         method: "POST",
         headers: { cookie, ...json },
@@ -59,4 +72,8 @@ async function create_document(i) {
 function get_documents() {
     return fetch(BASE_URL + "/document", { headers: { cookie } })
         .then(r => r.json())
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }

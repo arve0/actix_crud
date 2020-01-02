@@ -40,14 +40,11 @@ fn insert(
     let entry = DBEntry::new(document.into_inner(), &login);
     entry.insert(db)?;
 
-    let document = Document {
-        id: entry.id,
-        data: entry.data,
-    };
+    let document = Document::from(entry);
 
     updates.lock().unwrap().inserted(&document, &login);
 
-    Ok(HttpResponse::Created().body(document.id))
+    Ok(HttpResponse::Created().json(document))
 }
 
 fn get_all(login: AuthorizedUser, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
@@ -88,10 +85,10 @@ fn update(
     let username = login.username.clone();
     let data = data.into_inner();
 
-    if DBEntry::exists(&id, &username, &db)? {
+    if let Ok(created) = DBEntry::created(&id, &username, &db) {
         DBEntry::update(&id, &username, &data, db)?;
 
-        let document = Document { id, data };
+        let document = Document { id, created, data };
 
         updates.lock().unwrap().updated(&document, &login);
 
@@ -125,6 +122,7 @@ type DBResult<T> = Result<T, SqliteError>;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Document {
     id: String,
+    created: i64,
     data: JSON,
 }
 
@@ -132,8 +130,19 @@ impl Document {
     pub fn from_row(row: &Row) -> DBResult<Self> {
         Ok(Self {
             id: row.get(0)?,
-            data: row.get(1)?,
+            created: row.get(1)?,
+            data: row.get(2)?,
         })
+    }
+}
+
+impl From<DBEntry> for Document {
+    fn from(other: DBEntry) -> Self {
+        Self {
+            id: other.id,
+            created: other.created,
+            data: other.data,
+        }
     }
 }
 
@@ -155,7 +164,7 @@ impl DBEntry {
     }
 
     pub fn get_all(username: &str, db: PooledConnection) -> DBResult<Vec<Document>> {
-        db.prepare_cached("select id, data from document where username = :username order by created desc limit 100")?
+        db.prepare_cached("select id, created, data from document where username = :username order by created desc limit 100")?
             .query_map_named(
                 named_params! { ":username": username, },
                 Document::from_row
@@ -164,7 +173,7 @@ impl DBEntry {
     }
 
     pub fn get_by_id(id: String, username: &str, db: PooledConnection) -> DBResult<Document> {
-        db.prepare_cached("select id, data from document where id=:id and username=:username")?
+        db.prepare_cached("select id, created, data from document where id=:id and username=:username")?
             .query_row_named(
                 named_params! {
                     ":id": &id,
@@ -202,8 +211,8 @@ impl DBEntry {
         Ok(())
     }
 
-    fn exists(id: &str, username: &str, db: &PooledConnection) -> DBResult<bool> {
-        db.prepare_cached("select count(*) from document where id=:id and username=:username")?
+    fn created(id: &str, username: &str, db: &PooledConnection) -> DBResult<i64> {
+        db.prepare_cached("select created from document where id=:id and username=:username")?
             .query_row_named(
                 named_params! {
                     ":id": id,
@@ -211,7 +220,6 @@ impl DBEntry {
                 },
                 |row| row.get(0),
             )
-            .map(|count: i64| count != 0)
     }
 
     pub fn delete(id: &str, username: &str, db: PooledConnection) -> DBResult<bool> {
