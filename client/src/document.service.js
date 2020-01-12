@@ -5,7 +5,7 @@ const BASE_URL = "/document"
 
 // "pre-fetch"
 const _initial_documents = loggedIn
-    ? fetch(BASE_URL).then(r => {
+    ? fetch(BASE_URL).then(response => {
         if (response.status !== 200) {
             return [];
         }
