@@ -2,7 +2,7 @@ use actix_crud::{db, document, setting, updates, user};
 use actix_files::{Files, NamedFile};
 use actix_session::CookieSession;
 use actix_web::cookie::SameSite;
-use actix_web::{middleware, web, App, HttpServer};
+use actix_web::{middleware, http::header, web, App, HttpRequest, HttpServer, Responder};
 
 fn main() -> Result<(), failure::Error> {
     // enable logging with RUST_LOG=info
@@ -22,7 +22,7 @@ fn main() -> Result<(), failure::Error> {
             .wrap(
                 CookieSession::signed(&cookie_session_key)
                     .secure(false) // allow http (vs https)
-                    .http_only(true) // disallow access fra JS
+                    .http_only(true) // disallow access from JS
                     .same_site(SameSite::Lax), // disallow CSRF
             )
             .route("/", web::get().to(index))
@@ -37,6 +37,11 @@ fn main() -> Result<(), failure::Error> {
     server.run().map_err(failure::Error::from)
 }
 
-fn index() -> Result<NamedFile, std::io::Error> {
+fn index(req: HttpRequest) -> impl Responder {
     NamedFile::open("client/public/index.html")
+        .unwrap()
+        .with_header(
+            header::SET_COOKIE,
+            user::AuthorizedUser::logged_in_cookie(&req).to_string()
+        )
 }

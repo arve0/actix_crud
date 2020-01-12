@@ -1,19 +1,18 @@
 import { readable } from 'svelte/store';
 
-// "pre-fetch"
-const _username = fetch('/user').then(r => {
-    if (r.status !== 200) {
-        return null;
+export const username = readable(getUsernameFromCookie());
+export const loggedIn = readable(getUsernameFromCookie() !== "");
+
+function getUsernameFromCookie() {
+    let cookieName = "logged-in-user=";
+    let cookie = decodeURIComponent(document.cookie)
+        .split(";")
+        .map(c => c.trim())
+        .find(c => c.substr(0, cookieName.length) === cookieName)
+
+    if (cookie === undefined) {
+        return "";
+    } else {
+        return cookie.split("=")[1];
     }
-    return r.text();
-});
-
-export const username = readable(null, set => {
-    _username.then(set);
-});
-
-export const loggedIn = readable(false, set => {
-    _username.then(u => u !== null).then(set);
-});
-
-export const loggedInPromise = _username.then(u => u !== null);
+}

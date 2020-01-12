@@ -1,5 +1,6 @@
 use actix_session::Session;
 use actix_web::dev::Payload;
+use actix_web::http::Cookie;
 use actix_web::error::{ErrorBadRequest, ErrorInternalServerError, ErrorUnauthorized};
 use actix_web::{web, FromRequest, HttpRequest, HttpResponse};
 use bcrypt::{hash, verify};
@@ -223,5 +224,13 @@ impl AuthorizedUser {
             })?;
         self.session.remove("session");
         Ok(())
+    }
+
+    pub fn logged_in_cookie(req: &HttpRequest) -> Cookie {
+        if let Ok(user) = Self::from_request(req, &mut Payload::None) {
+            Cookie::new("logged-in-user", user.username)
+        } else {
+            Cookie::new("logged-in-user", "")
+        }
     }
 }

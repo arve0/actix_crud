@@ -1,20 +1,17 @@
 import { writable } from "svelte/store";
-import { loggedInPromise } from './user.service.js'
+import { loggedIn } from './user.service.js'
 
 const BASE_URL = "/document"
 
 // "pre-fetch"
-const _initial_documents = loggedInPromise.then(isLoggedIn => {
-    if (isLoggedIn) {
-        return fetch(BASE_URL);
-    }
-    return {} // empty response
-}).then(response => {
-    if (response.status !== 200) {
-        return [];
-    }
-    return response.json();
-});
+const _initial_documents = loggedIn
+    ? fetch(BASE_URL).then(r => {
+        if (response.status !== 200) {
+            return [];
+        }
+        return response.json();
+    })
+    : Promise.resolve([]); // empty response
 
 const { set, subscribe, update } = writable([], set => _initial_documents.then(set));
 
