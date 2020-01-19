@@ -2,7 +2,7 @@ use actix_crud::{db, document, setting, updates, user};
 use actix_files::{Files, NamedFile};
 use actix_session::CookieSession;
 use actix_web::cookie::SameSite;
-use actix_web::{middleware, http::header, web, App, HttpRequest, HttpServer, Responder};
+use actix_web::{http::header, middleware, web, App, HttpRequest, HttpServer, Responder};
 
 fn main() -> Result<(), failure::Error> {
     // enable logging with RUST_LOG=info
@@ -42,6 +42,6 @@ fn index(req: HttpRequest) -> impl Responder {
         .unwrap()
         .with_header(
             header::SET_COOKIE,
-            user::AuthorizedUser::logged_in_cookie(&req).to_string()
+            user::AuthorizedUser::logged_in_cookie(&req).to_string(),
         )
 }

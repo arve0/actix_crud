@@ -1,7 +1,7 @@
 use actix_session::Session;
 use actix_web::dev::Payload;
-use actix_web::http::Cookie;
 use actix_web::error::{ErrorBadRequest, ErrorInternalServerError, ErrorUnauthorized};
+use actix_web::http::Cookie;
 use actix_web::{web, FromRequest, HttpRequest, HttpResponse};
 use bcrypt::{hash, verify};
 use rusqlite::Error as SqliteError;

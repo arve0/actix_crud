@@ -92,16 +92,16 @@ description="insert data"
 expected=" 201"
 result=$(curl -s -w ' %{http_code}' -b cookies -c cookies -X POST -d @test/data.json -H 'content-type: application/json' $base/document)
 assert
-id_not_deleted=$(echo $result | sed -e 's/{"id":"//' | sed -e 's/".*//')
+id_not_deleted=$(echo $result | sed -e 's/{.*"id":"//' | sed -e 's/".*//')
 
 description="insert data again"
 expected=" 201"
 result=$(curl -s -w ' %{http_code}' -b cookies -c cookies -X POST -d @test/data.json -H 'content-type: application/json' $base/document)
 assert
-id=$(echo $result | sed -e 's/{"id":"//' | sed -e 's/".*//')
+id=$(echo $result | sed -e 's/.*"id":"//' | sed -e 's/".*//')
 
 description="get inserted data"
-expected='{"id":"'
+expected='{"pk":2,"id":"'
 expected+=$id
 expected+='","created":'
 result=$(curl -s -w ' %{http_code}' -b cookies -c cookies $base/document/$id)
@@ -117,7 +117,7 @@ result=$(curl -s -w ' %{http_code}' -b cookies -c cookies -X PUT -d @test/data_u
 assert
 
 description="get updated data"
-expected='{"id":"'
+expected='{"pk":2,"id":"'
 expected+=$id
 expected+='","created":'
 result=$(curl -s -w ' %{http_code}' -b cookies -c cookies $base/document/$id)
@@ -158,10 +158,10 @@ description="insert thief data"
 expected=" 201"
 result=$(curl -s -w ' %{http_code}' -b cookies -c cookies -X POST -d @test/thief_data.json -H 'content-type: application/json' $base/document)
 assert
-id=$(echo $result | sed -e 's/{"id":"//' | sed -e 's/".*//')
+id=$(echo $result | sed -e 's/{.*"id":"//' | sed -e 's/".*//')
 
 description="get thief's inserted data"
-expected='{"id":"'
+expected='{"pk":2,"id":"'
 expected+=$id
 expected+='","created":'
 result=$(curl -s -w ' %{http_code}' -b cookies -c cookies $base/document/$id)
@@ -175,7 +175,7 @@ result=$(curl -s -w ' %{http_code}' -b cookies -c cookies -X PUT -d @test/data_u
 assert
 
 description="get updated data"
-expected='{"id":"'
+expected='{"pk":2,"id":"'
 expected+=$id
 expected+='","created":'
 result=$(curl -s -w ' %{http_code}' -b cookies -c cookies $base/document/$id)
@@ -193,4 +193,6 @@ expected="logged out 303"
 result=$(curl -s -w ' %{http_code}' -b cookies -c cookies $base/user/logout)
 assert
 
-echo "All tests OK"
+echo "All curl tests OK, running mocha tests:"
+
+npm -C test test

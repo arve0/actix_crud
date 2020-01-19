@@ -2,9 +2,10 @@ use actix_web::error::{ErrorInternalServerError, ErrorNotFound};
 use actix_web::{web, HttpResponse};
 use chrono::Utc;
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
-use rusqlite::{named_params, Error as SqliteError, Row};
+use rusqlite::{named_params, params, Error as SqliteError, Row};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::value::RawValue;
+use std::collections::HashMap;
 use std::sync::Mutex;
 use uuid::Uuid;
 
@@ -31,25 +32,27 @@ pub fn config(cfg: &mut web::ServiceConfig) {
 }
 
 fn insert(
-    document: web::Json<JSON>,
+    data: web::Json<JSON>,
     login: AuthorizedUser,
     pool: web::Data<Pool>,
     updates: web::Data<Mutex<ClientUpdates>>,
 ) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
-    let entry = DBEntry::new(document.into_inner(), &login);
-    entry.insert(db)?;
-
-    let document = Document::from(entry);
+    let document = Document::insert(data.into_inner(), &login, db)?;
 
     updates.lock().unwrap().inserted(&document, &login);
 
     Ok(HttpResponse::Created().json(document))
 }
 
-fn get_all(login: AuthorizedUser, pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
+fn get_all(
+    parameters: web::Query<HashMap<String, i64>>,
+    login: AuthorizedUser,
+    pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let before = parameters.get("before").unwrap_or(&i64::max_value());
     let db = pool.get()?;
-    let entries = DBEntry::get_all(&login.username, db).map_err(|err| match err {
+    let entries = Document::get_all_before(*before, &login, db).map_err(|err| match err {
         SqliteError::QueryReturnedNoRows => ErrorNotFound("not found"),
         err => ErrorInternalServerError(err),
     })?;
@@ -63,11 +66,10 @@ fn get(
     pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
-    let entry =
-        DBEntry::get_by_id(id.into_inner(), &login.username, db).map_err(|err| match err {
-            SqliteError::QueryReturnedNoRows => ErrorNotFound("not found"),
-            err => ErrorInternalServerError(err),
-        })?;
+    let entry = Document::get_by_id(&id.into_inner(), &login, db).map_err(|err| match err {
+        SqliteError::QueryReturnedNoRows => ErrorNotFound("not found"),
+        err => ErrorInternalServerError(err),
+    })?;
 
     Ok(HttpResponse::Ok().json(entry))
 }
@@ -82,13 +84,10 @@ fn update(
     let db = pool.get()?;
 
     let id = id.into_inner();
-    let username = login.username.clone();
     let data = data.into_inner();
 
-    if let Ok(created) = DBEntry::created(&id, &username, &db) {
-        DBEntry::update(&id, &username, &data, db)?;
-
-        let document = Document { id, created, data };
+    if let Ok(metadata) = Document::get_by_id_without_data(&id, &login, &db) {
+        let document = Document::update(metadata, data, db)?;
 
         updates.lock().unwrap().updated(&document, &login);
 
@@ -106,7 +105,7 @@ fn delete(
 ) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
     let id = id.into_inner();
-    let deleted = DBEntry::delete(&id, &login.username, db)?;
+    let deleted = Document::delete(&id, &login, db)?;
 
     if deleted {
         updates.lock().unwrap().deleted(&id, &login);
@@ -121,119 +120,138 @@ type DBResult<T> = Result<T, SqliteError>;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Document {
+    pk: i64,
     id: String,
     created: i64,
     data: JSON,
 }
 
 impl Document {
-    pub fn from_row(row: &Row) -> DBResult<Self> {
+    pub fn insert(data: JSON, login: &AuthorizedUser, db: PooledConnection) -> DBResult<Document> {
+        let id: String = Uuid::new_v4().to_string();
+        let created = Utc::now().timestamp();
+
+        let pk = db
+            .prepare_cached(
+                "insert into document (id, created, updated, username, data)
+                values (?, ?, ?, ?, ?)",
+            )?
+            .insert(params![&id, &created, &created, login.username, &data])?;
+
         Ok(Self {
-            id: row.get(0)?,
-            created: row.get(1)?,
-            data: row.get(2)?,
+            pk,
+            id,
+            created,
+            data,
         })
     }
-}
 
-impl From<DBEntry> for Document {
-    fn from(other: DBEntry) -> Self {
-        Self {
-            id: other.id,
-            created: other.created,
-            data: other.data,
-        }
-    }
-}
-
-struct DBEntry {
-    id: String,
-    created: i64,
-    username: String,
-    data: JSON,
-}
-
-impl DBEntry {
-    pub fn new(document: JSON, login: &AuthorizedUser) -> Self {
-        Self {
-            id: format!("{}", Uuid::new_v4()),
-            created: Utc::now().timestamp(),
-            username: login.username.clone(),
-            data: document,
-        }
+    pub fn from_row(row: &Row) -> DBResult<Self> {
+        Ok(Self {
+            pk: row.get(0)?,
+            id: row.get(1)?,
+            created: row.get(2)?,
+            data: row.get(3)?,
+        })
     }
 
-    pub fn get_all(username: &str, db: PooledConnection) -> DBResult<Vec<Document>> {
-        db.prepare_cached("select id, created, data from document where username = :username order by created desc limit 100")?
-            .query_map_named(
-                named_params! { ":username": username, },
-                Document::from_row
+    pub fn from_row_without_data(row: &Row) -> DBResult<Self> {
+        Ok(Self {
+            pk: row.get(0)?,
+            id: row.get(1)?,
+            created: row.get(2)?,
+            data: Default::default(),
+        })
+    }
+
+    pub fn get_all_before(
+        before: i64,
+        login: &AuthorizedUser,
+        db: PooledConnection,
+    ) -> DBResult<Vec<Document>> {
+        db.prepare_cached(
+            "select pk, id, created, data from document
+            where pk < :pk and username = :username
+            order by pk desc limit 100",
+        )?
+        .query_map_named(
+            named_params! {
+                ":pk": before,
+                ":username": login.username,
+            },
+            Document::from_row,
+        )?
+        .collect()
+    }
+
+    pub fn get_by_id(id: &str, login: &AuthorizedUser, db: PooledConnection) -> DBResult<Document> {
+        db.prepare_cached(
+            "select pk, id, created, data from document
+            where id=:id and username=:username",
+        )?
+        .query_row_named(
+            named_params! {
+                ":id": id,
+                ":username": login.username,
+            },
+            Document::from_row,
+        )
+    }
+
+    pub fn update(metadata: Document, data: JSON, db: PooledConnection) -> DBResult<Document> {
+        let updated = Utc::now().timestamp();
+        let number_of_rows = db
+            .prepare_cached(
+                "update document
+                set data=:data, updated=:updated
+                where pk=:pk",
             )?
-            .collect()
-    }
-
-    pub fn get_by_id(id: String, username: &str, db: PooledConnection) -> DBResult<Document> {
-        db.prepare_cached("select id, created, data from document where id=:id and username=:username")?
-            .query_row_named(
-                named_params! {
-                    ":id": &id,
-                    ":username": &username,
-                },
-                Document::from_row,
-            )
-    }
-
-    pub fn insert(&self, db: PooledConnection) -> DBResult<()> {
-        let number_of_rows = db
-            .prepare_cached("insert into document (id, created, updated, username, data) values (:id, :created, :updated, :username, :data)")?
             .execute_named(named_params! {
-                ":id": self.id,
-                ":created": self.created,
-                ":updated": self.created,
-                ":username": self.username,
-                ":data": self.data,
+                ":pk": metadata.pk,
+                ":updated": &updated,
+                ":data": &data,
             })?;
 
         assert!(number_of_rows == 1);
-        Ok(())
+
+        Ok(Self {
+            pk: metadata.pk,
+            id: metadata.id,
+            created: metadata.created,
+            data,
+        })
     }
 
-    pub fn update(id: &str, username: &str, data: &JSON, db: PooledConnection) -> DBResult<()> {
-        let number_of_rows = db
-            .prepare_cached("update document set data=:data, updated=:updated where id=:id and username=:username")?
-            .execute_named(named_params! {
-                ":id": &id,
-                ":updated": Utc::now().timestamp(),
-                ":username": &username,
-                ":data": data,
-            })?;
-        assert!(number_of_rows == 1);
-        Ok(())
+    fn get_by_id_without_data(
+        id: &str,
+        login: &AuthorizedUser,
+        db: &PooledConnection,
+    ) -> DBResult<Document> {
+        db.prepare_cached(
+            "select pk, id, created, username from document
+            where id=:id and username=:username",
+        )?
+        .query_row_named(
+            named_params! {
+                ":id": id,
+                ":username": login.username,
+            },
+            Document::from_row_without_data,
+        )
     }
 
-    fn created(id: &str, username: &str, db: &PooledConnection) -> DBResult<i64> {
-        db.prepare_cached("select created from document where id=:id and username=:username")?
-            .query_row_named(
-                named_params! {
-                    ":id": id,
-                    ":username": username,
-                },
-                |row| row.get(0),
-            )
-    }
-
-    pub fn delete(id: &str, username: &str, db: PooledConnection) -> DBResult<bool> {
+    pub fn delete(id: &str, login: &AuthorizedUser, db: PooledConnection) -> DBResult<bool> {
         db.prepare_cached("delete from document where id=:id and username=:username")?
             .execute_named(named_params! {
                 ":id": id,
-                ":username": username,
+                ":username": login.username,
             })
             .map(|count| count != 0)
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct JSON(Box<RawValue>);
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct JSON(Box<RawValue>);
 
 impl FromSql for JSON {
     fn column_result(value: ValueRef) -> FromSqlResult<Self> {

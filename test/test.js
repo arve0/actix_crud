@@ -1,11 +1,13 @@
 const fetch = require("node-fetch")
 const assert = require("assert")
 
+const CREATE_N_DOCUMENTS = 123;
+
 describe("documents", function () {
     before(async function () {
         await register_and_login()
 
-        let creating_documents = [...Array(123).keys()].map(create_document);
+        let creating_documents = [...Array(CREATE_N_DOCUMENTS).keys()].map(create_document);
         await Promise.all(creating_documents);
     })
 
@@ -14,17 +16,30 @@ describe("documents", function () {
         assert.equal(documents.length, 100)
     })
 
-    it("should be sorted by date", async function () {
+    it("should be sorted by primary key, latest insertion first", async function () {
         let documents = await get_documents()
 
-        assert.notEqual(documents[0].created, undefined);
+        assert.equal(documents[0].pk, CREATE_N_DOCUMENTS);
 
         let prev = documents[1];
         for (let document of documents.slice(1)) {
-            assert(document.created <= prev.created);
+            assert(document.pk <= prev.pk);
             prev = document;
         }
     })
+
+    it("should get before primary key", async function () {
+        let documents = await get_documents({ before_pk: 51 })
+
+        assert.equal(documents.length, 50); // sqlite is 1-indexed
+
+        let pk = 50;
+        for (let document of documents) {
+            assert.equal(document.pk, pk);
+            pk -= 1;
+        }
+    })
+
 })
 
 const BASE_URL = "http://localhost:8080"
@@ -69,8 +84,11 @@ async function create_document(i) {
     }
 }
 
-function get_documents() {
-    return fetch(BASE_URL + "/document", { headers: { cookie } })
+function get_documents({ before_pk } = {}) {
+    let before = before_pk !== undefined
+        ? `?before=${before_pk}`
+        : "";
+    return fetch(BASE_URL + `/document${before}`, { headers: { cookie } })
         .then(r => r.json())
 }
 
