@@ -2,3 +2,4 @@
 **/*.rs.bk
 bench.sqlite*
 cookies
+node_modules

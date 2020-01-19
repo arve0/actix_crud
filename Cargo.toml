@@ -25,6 +25,7 @@ bcrypt = "0.4"
 uuid = { version = "0.7", features = ["v4"] }
 rand = "0.6"
 tokio = "0.1"
+chrono = "0.4"
 
 [dev-dependencies]
 criterion = "0.2"

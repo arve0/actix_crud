@@ -1,3 +1,5 @@
+-- add columns for sorting documents
+drop table document;
 create table document (
     pk integer primary key,
     id text not null,

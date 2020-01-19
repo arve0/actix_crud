@@ -9,10 +9,12 @@ result=""
 assert () {
   if [[ $result != *"$expected"* ]]
   then
-    echo "Assertion failure: $description"
+    echo "❌ $description"
     echo "Expected:  '$expected'"
     echo "Actually:  '$result'"
     exit 1
+  else
+    echo "✅ $description"
   fi
 }
 
@@ -90,19 +92,23 @@ description="insert data"
 expected=" 201"
 result=$(curl -s -w ' %{http_code}' -b cookies -c cookies -X POST -d @test/data.json -H 'content-type: application/json' $base/document)
 assert
-id_not_deleted=$(echo $result | sed -e 's/ 201//')
+id_not_deleted=$(echo $result | sed -e 's/{.*"id":"//' | sed -e 's/".*//')
 
 description="insert data again"
 expected=" 201"
 result=$(curl -s -w ' %{http_code}' -b cookies -c cookies -X POST -d @test/data.json -H 'content-type: application/json' $base/document)
 assert
-id=$(echo $result | sed -e 's/ 201//')
+id=$(echo $result | sed -e 's/.*"id":"//' | sed -e 's/".*//')
 
 description="get inserted data"
-expected='{"id":"'
+expected='{"pk":2,"id":"'
 expected+=$id
-expected+='","data":{"b" : 111}} 200'
+expected+='","created":'
 result=$(curl -s -w ' %{http_code}' -b cookies -c cookies $base/document/$id)
+# before created
+assert
+# after created
+expected=',"data":{"b" : 111}} 200'
 assert
 
 description="update inserted data"
@@ -111,10 +117,12 @@ result=$(curl -s -w ' %{http_code}' -b cookies -c cookies -X PUT -d @test/data_u
 assert
 
 description="get updated data"
-expected='{"id":"'
+expected='{"pk":2,"id":"'
 expected+=$id
-expected+='","data":{"c": 444}} 200'
+expected+='","created":'
 result=$(curl -s -w ' %{http_code}' -b cookies -c cookies $base/document/$id)
+assert
+expected=',"data":{"c": 444}} 200'
 assert
 
 description="delete data"
@@ -150,13 +158,15 @@ description="insert thief data"
 expected=" 201"
 result=$(curl -s -w ' %{http_code}' -b cookies -c cookies -X POST -d @test/thief_data.json -H 'content-type: application/json' $base/document)
 assert
-id=$(echo $result | sed -e 's/ 201//')
+id=$(echo $result | sed -e 's/{.*"id":"//' | sed -e 's/".*//')
 
 description="get thief's inserted data"
-expected='{"id":"'
+expected='{"pk":2,"id":"'
 expected+=$id
-expected+='","data":{"thief": true}} 200'
+expected+='","created":'
 result=$(curl -s -w ' %{http_code}' -b cookies -c cookies $base/document/$id)
+assert
+expected=',"data":{"thief": true}} 200'
 assert
 
 description="update inserted data"
@@ -165,10 +175,12 @@ result=$(curl -s -w ' %{http_code}' -b cookies -c cookies -X PUT -d @test/data_u
 assert
 
 description="get updated data"
-expected='{"id":"'
+expected='{"pk":2,"id":"'
 expected+=$id
-expected+='","data":{"c": 444}} 200'
+expected+='","created":'
 result=$(curl -s -w ' %{http_code}' -b cookies -c cookies $base/document/$id)
+assert
+expected=',"data":{"c": 444}} 200'
 assert
 
 description="delete data"
@@ -181,4 +193,6 @@ expected="logged out 303"
 result=$(curl -s -w ' %{http_code}' -b cookies -c cookies $base/user/logout)
 assert
 
-echo "All tests OK"
+echo "All curl tests OK, running mocha tests:"
+
+npm -C test test

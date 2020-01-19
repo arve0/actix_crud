@@ -14,8 +14,7 @@ use crate::user::AuthorizedUser;
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
-        web::scope("/updates")
-            .service(web::resource("").route(web::get().to(register_client))),
+        web::scope("/updates").service(web::resource("").route(web::get().to(register_client))),
     );
 }
 

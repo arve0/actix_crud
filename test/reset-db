@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+sqlite3 ../storage/database.sqlite "delete from document"
+sqlite3 ../storage/database.sqlite "delete from user"
+sqlite3 ../storage/database.sqlite "delete from user_session"
