@@ -4,12 +4,14 @@ use bcrypt::BcryptError;
 use db::is_primary_key_constraint;
 use rusqlite::Error as SqliteError;
 
+pub mod app;
 pub mod db;
 pub mod document;
 pub mod setting;
 pub mod updates;
 pub mod user;
 
+pub use app::App;
 /**
  * Wrap actix_web::Error inside our own error type, such
  * that we can implement the From trait and avoid
