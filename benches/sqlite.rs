@@ -17,7 +17,7 @@ criterion_group!(benches, sqlite_benchmark);
 criterion_main!(benches);
 
 const NUMBER_OF_ROWS: u32 = 10_000;
-const DB_FILENAME: &str = "bench.sqlite";
+const DB_FILENAME: &str = "storage/bench.sqlite";
 
 fn sqlite_benchmark(c: &mut Criterion) {
     c.bench_function("get random id", |b| {
@@ -34,7 +34,7 @@ fn sqlite_benchmark(c: &mut Criterion) {
         let db = create_filled_db(NUMBER_OF_ROWS);
 
         b.iter(|| {
-            let value: u32 = db
+            let _value: u32 = db
                 .query_row("SELECT value FROM bench WHERE id = ?1", &[123], |r| {
                     r.get(0)
                 })

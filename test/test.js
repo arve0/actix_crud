@@ -40,6 +40,22 @@ describe("documents", function () {
         }
     })
 
+    it("should create documents idempotent", async function () {
+        let a = await create_document_with_id_and_data("asdf")
+        let b = await create_document_with_id_and_data("asdf")
+
+        assert.deepEqual(a, b);
+    })
+
+    it("should not allow creating with same id when data differs", async function () {
+        let a = await create_document_with_id_and_data("different-data", 1234)
+        try {
+            let b = await create_document_with_id_and_data("different-data", 4321)
+        } catch (error) {
+            return
+        }
+        throw new Error("Should not be able to create document twice with different data")
+    })
 })
 
 const BASE_URL = "http://localhost:8080"
@@ -71,7 +87,6 @@ async function register_and_login() {
 }
 
 async function create_document(i) {
-    await sleep(Math.random() * 1100); // different `created` values
     let result = await fetch(BASE_URL + "/document", {
         method: "POST",
         headers: { cookie, ...json },
@@ -84,14 +99,25 @@ async function create_document(i) {
     }
 }
 
+async function create_document_with_id_and_data(id, data="data") {
+    let result = await fetch(BASE_URL + "/document/" + id, {
+        method: "POST",
+        headers: { cookie, ...json },
+        body: `{"key":${JSON.stringify(data)}}`,
+    });
+
+    if (result.status !== 201) {
+        let reason = await result.text();
+        throw new Error(`Status: ${result.status}, body: ${reason}`)
+    }
+
+    return await result.json()
+}
+
 function get_documents({ before_pk } = {}) {
     let before = before_pk !== undefined
         ? `?before=${before_pk}`
         : "";
     return fetch(BASE_URL + `/document${before}`, { headers: { cookie } })
         .then(r => r.json())
-}
-
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
 }

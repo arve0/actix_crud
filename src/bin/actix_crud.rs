@@ -5,7 +5,7 @@ fn main() -> Result<(), failure::Error> {
     // enable logging with RUST_LOG=info
     env_logger::init();
 
-    let crud = actix_crud::App::create();
+    let crud = actix_crud::App::create("storage/database.sqlite");
     let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
 
     let server = HttpServer::new(move || {

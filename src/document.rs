@@ -1,4 +1,4 @@
-use actix_web::error::{ErrorInternalServerError, ErrorNotFound};
+use actix_web::error::{ErrorConflict, ErrorInternalServerError, ErrorNotFound};
 use actix_web::{web, HttpResponse};
 use chrono::Utc;
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
@@ -26,7 +26,8 @@ pub fn config(cfg: &mut web::ServiceConfig) {
                 web::resource("/{id}")
                     .route(web::get().to(get))
                     .route(web::delete().to(delete))
-                    .route(web::put().to(update)),
+                    .route(web::put().to(update))
+                    .route(web::post().to(insert_idempotent)),
             ),
     );
 }
@@ -66,7 +67,7 @@ fn get(
     pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
     let db = pool.get()?;
-    let entry = Document::get_by_id(&id.into_inner(), &login, db).map_err(|err| match err {
+    let entry = Document::get_by_id(&id.into_inner(), &login, &db).map_err(|err| match err {
         SqliteError::QueryReturnedNoRows => ErrorNotFound("not found"),
         err => ErrorInternalServerError(err),
     })?;
@@ -96,6 +97,35 @@ fn update(
         Err(ErrorNotFound([&id, " not found"].concat()).into())
     }
 }
+
+fn insert_idempotent(
+    id: web::Path<String>,
+    data: web::Json<JSON>,
+    login: AuthorizedUser,
+    pool: web::Data<Pool>,
+    updates: web::Data<Mutex<ClientUpdates>>,
+) -> Result<HttpResponse, Error> {
+    let db = pool.get()?;
+
+    let id = id.into_inner();
+    let data = data.into_inner();
+
+    if let Ok(existing) = Document::get_by_id(&id, &login, &db) {
+        let existing_data = existing.data.0.get();
+        let new_data = data.0.get();
+        if existing_data == new_data {
+            Ok(HttpResponse::Created().json(existing))
+        } else {
+            Err(ErrorConflict([&id, " already exists and data is not the same"].concat()).into())
+        }
+    } else {
+        let document = Document::insert_with_id(id, data, &login, db)?;
+        updates.lock().unwrap().inserted(&document, &login);
+
+        Ok(HttpResponse::Created().json(document))
+    }
+}
+
 
 fn delete(
     id: web::Path<String>,
@@ -129,6 +159,10 @@ pub struct Document {
 impl Document {
     pub fn insert(data: JSON, login: &AuthorizedUser, db: PooledConnection) -> DBResult<Document> {
         let id: String = Uuid::new_v4().to_string();
+        Self::insert_with_id(id, data, login, db)
+    }
+
+    pub fn insert_with_id(id: String, data: JSON, login: &AuthorizedUser, db: PooledConnection) -> DBResult<Document> {
         let created = Utc::now().timestamp();
 
         let pk = db
@@ -184,7 +218,7 @@ impl Document {
         .collect()
     }
 
-    pub fn get_by_id(id: &str, login: &AuthorizedUser, db: PooledConnection) -> DBResult<Document> {
+    pub fn get_by_id(id: &str, login: &AuthorizedUser, db: &PooledConnection) -> DBResult<Document> {
         db.prepare_cached(
             "select pk, id, created, data from document
             where id=:id and username=:username",

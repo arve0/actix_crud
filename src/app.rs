@@ -14,8 +14,8 @@ pub struct App {
 }
 
 impl App {
-    pub fn create() -> Self {
-        let db_pool = db::get_pool();
+    pub fn create(filename: &str) -> Self {
+        let db_pool = db::get_pool(filename);
         let client_updates = updates::ClientUpdates::create();
         let cookie_session_key = setting::get_or_create_cookie_session_key(
             &db_pool.get().expect("unable to get db connection"),
