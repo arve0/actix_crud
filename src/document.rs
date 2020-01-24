@@ -1,4 +1,4 @@
-use actix_web::error::{ErrorConflict, ErrorInternalServerError, ErrorNotFound};
+use actix_web::error::{ErrorConflict, ErrorInternalServerError, ErrorNotFound, ErrorBadRequest};
 use actix_web::{web, HttpResponse};
 use chrono::Utc;
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
@@ -51,16 +51,23 @@ fn get_all(
     login: AuthorizedUser,
     pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
-    let below_pk = parameters.get("below_pk").and_then(|x| x.parse().ok()).unwrap_or(i64::max_value());
-    let search = parameters.get("search");
+    let above_pk = parameters.get("above_pk").and_then(|x| x.parse::<i64>().ok());
+    let below_pk = parameters.get("below_pk").and_then(|x| x.parse::<i64>().ok());
+
+    if above_pk.is_some() && below_pk.is_some() {
+        return Err(ErrorBadRequest("both above_pk and below_pk are not allowed").into());
+    }
+
+    let pk = PrimaryKeyQuery::from_parameters(above_pk, below_pk);
+    let search_text = parameters.get("search");
     let db = pool.get()?;
 
-    let entries = match search {
-        Some(text) => Document::get_all_below_pk_matching_text(below_pk, text, &login, &db).map_err(|err| match err {
+    let entries = match search_text {
+        Some(text) => Document::get_all_below_pk_matching_text(below_pk.unwrap_or(i64::max_value()), text, &login, &db).map_err(|err| match err {
             SqliteError::QueryReturnedNoRows => ErrorNotFound("not found"),
             err => ErrorInternalServerError(err),
         })?,
-        None => Document::get_all_below_pk(below_pk, &login, &db).map_err(|err| match err {
+        None => Document::get_all(pk, &login, &db).map_err(|err| match err {
             SqliteError::QueryReturnedNoRows => ErrorNotFound("not found"),
             err => ErrorInternalServerError(err),
         })?
@@ -224,25 +231,49 @@ impl Document {
         })
     }
 
-    pub fn get_all_below_pk(
-        below_pk: i64,
+    fn get_all(
+        pk: PrimaryKeyQuery,
         login: &AuthorizedUser,
         db: &PooledConnection,
     ) -> DBResult<Vec<Document>> {
-        db.prepare_cached(
-            "select pk, id, created, data from document
-            where pk < :pk and username = :username
-            order by pk desc limit 100",
-        )?
-        .query_map_named(
-            named_params! {
-                ":pk": below_pk,
-                ":username": login.username,
+        let query = match pk {
+            PrimaryKeyQuery::Above(_) =>
+                "select pk, id, created, data from document where pk > :pk and username = :username order by pk asc limit 100",
+            PrimaryKeyQuery::Below(_) =>
+                "select pk, id, created, data from document where pk < :pk and username = :username order by pk desc limit 100",
+            PrimaryKeyQuery::None =>
+                "select pk, id, created, data from document where username = :username order by pk desc limit 100",
+        };
+
+        let mut statement = db.prepare_cached(query)?;
+        let result = match pk {
+            PrimaryKeyQuery::Above(pk) | PrimaryKeyQuery::Below(pk) => statement.query_map_named(
+                named_params!{
+                    ":pk": pk,
+                    ":username": login.username,
+                },
+                Document::from_row,
+            )?,
+            PrimaryKeyQuery::None => statement.query_map_named(
+                named_params!{
+                    ":username": login.username,
+                },
+                Document::from_row,
+            )?,
+        };
+
+        let result: DBResult<Vec<Document>> = result.collect();
+
+        match pk {
+            PrimaryKeyQuery::Above(_) => {
+                result.map(|mut entries| {
+                    entries.reverse();
+                    entries
+                })
             },
-            Document::from_row,
-        )?
-        .collect()
-    }
+            PrimaryKeyQuery::Below(_) | PrimaryKeyQuery::None => result,
+        }
+}
 
     pub fn get_all_below_pk_matching_text(
         below_pk: i64,
@@ -388,5 +419,22 @@ impl FromSql for JSON {
 impl ToSql for JSON {
     fn to_sql(&self) -> rusqlite::Result<ToSqlOutput> {
         Ok(ToSqlOutput::from(self.0.get()))
+    }
+}
+
+enum PrimaryKeyQuery {
+    Above(i64),
+    Below(i64),
+    None
+}
+
+impl PrimaryKeyQuery {
+    fn from_parameters(above: Option<i64>, below: Option<i64>) -> Self {
+        match (above, below) {
+            (Some(value), None) => PrimaryKeyQuery::Above(value),
+            (None, Some(value)) => PrimaryKeyQuery::Below(value),
+            (None, None) => PrimaryKeyQuery::None,
+            (Some(_), Some(_)) => panic!("both above and below not allowed due to ambiguous ordering"),
+        }
     }
 }

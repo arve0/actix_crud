@@ -89,6 +89,25 @@ describe("documents", function () {
         assert.equal(prev_link, null)
     })
 
+    it("should give prev page when using above primary key", async function () {
+        let response = await get_documents_response({ above_pk: 2 })
+        let next_link = response.headers.get("link-next")
+        let prev_link = response.headers.get("link-prev")
+
+        let expected_next_link = `/document?below_pk=3`
+        let expected_prev_link = `/document?above_pk=102`
+
+        assert.equal(next_link, expected_next_link)
+        assert.equal(prev_link, expected_prev_link)
+
+        let documents = await response.json()
+        let first_pk = documents[0].pk;
+        let last_pk = documents[documents.length - 1].pk;
+
+        assert.equal(first_pk, 102)
+        assert.equal(last_pk, 3)
+    })
+
     it("should search in json data", async function () {
         let documents = await get_documents({ search: 100 })
         assert.equal(documents.length, 1)
