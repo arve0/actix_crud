@@ -1,4 +1,0 @@
-- builds
-  - musl build for linux
-  - mac
-  - windows
