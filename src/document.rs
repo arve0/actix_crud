@@ -47,16 +47,24 @@ fn insert(
 }
 
 fn get_all(
-    parameters: web::Query<HashMap<String, i64>>,
+    parameters: web::Query<HashMap<String, String>>,
     login: AuthorizedUser,
     pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
-    let below_pk = parameters.get("below_pk").unwrap_or(&i64::max_value());
+    let below_pk = parameters.get("below_pk").and_then(|x| x.parse().ok()).unwrap_or(i64::max_value());
+    let search = parameters.get("search");
     let db = pool.get()?;
-    let entries = Document::get_all_below_pk(*below_pk, &login, &db).map_err(|err| match err {
-        SqliteError::QueryReturnedNoRows => ErrorNotFound("not found"),
-        err => ErrorInternalServerError(err),
-    })?;
+
+    let entries = match search {
+        Some(text) => Document::get_all_below_pk_matching_text(below_pk, text, &login, &db).map_err(|err| match err {
+            SqliteError::QueryReturnedNoRows => ErrorNotFound("not found"),
+            err => ErrorInternalServerError(err),
+        })?,
+        None => Document::get_all_below_pk(below_pk, &login, &db).map_err(|err| match err {
+            SqliteError::QueryReturnedNoRows => ErrorNotFound("not found"),
+            err => ErrorInternalServerError(err),
+        })?
+    };
 
     let mut response = HttpResponse::Ok();
 
@@ -230,6 +238,29 @@ impl Document {
             named_params! {
                 ":pk": below_pk,
                 ":username": login.username,
+            },
+            Document::from_row,
+        )?
+        .collect()
+    }
+
+    pub fn get_all_below_pk_matching_text(
+        below_pk: i64,
+        text: &str,
+        login: &AuthorizedUser,
+        db: &PooledConnection,
+    ) -> DBResult<Vec<Document>> {
+        let text = ["%", text ,"%"].concat();
+        db.prepare_cached(
+            "select pk, id, created, data from document
+            where pk < :pk and username = :username and data like :text
+            order by pk desc limit 100",
+        )?
+        .query_map_named(
+            named_params! {
+                ":pk": below_pk,
+                ":username": login.username,
+                ":text": text,
             },
             Document::from_row,
         )?

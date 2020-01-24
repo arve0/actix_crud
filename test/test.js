@@ -88,6 +88,11 @@ describe("documents", function () {
         let prev_link = response.headers.get("link-prev")
         assert.equal(prev_link, null)
     })
+
+    it("should search in json data", async function () {
+        let documents = await get_documents({ search: 100 })
+        assert.equal(documents.length, 1)
+    })
 })
 
 const BASE_URL = "http://localhost:8080"
@@ -146,14 +151,24 @@ async function create_document_with_id_and_data(id, data="data") {
     return await result.json()
 }
 
-function get_documents({ below_pk } = {}) {
-    return get_documents_response({ below_pk })
+function get_documents(query = {}) {
+    return get_documents_response(query)
         .then(r => r.json())
 }
 
-function get_documents_response({ below_pk } = {}) {
-    let below = below_pk !== undefined
-        ? `?below_pk=${below_pk}`
-        : "";
-    return fetch(BASE_URL + `/document${below}`, { headers: { cookie } })
+function get_documents_response(query = {}) {
+    let q = to_query_if_defined(query)
+
+    return fetch(BASE_URL + `/document${q}`, { headers: { cookie } })
+}
+
+function to_query_if_defined(query) {
+    let entries = Object.entries(query)
+        .map(([key, val]) => `${key}=${val}`);
+
+    if (entries.length === 0) {
+        return ""
+    }
+
+    return "?" + entries.join("&")
 }
