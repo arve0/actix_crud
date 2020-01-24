@@ -28,8 +28,8 @@ describe("documents", function () {
         }
     })
 
-    it("should get before primary key", async function () {
-        let documents = await get_documents({ before_pk: 51 })
+    it("should get below primary key", async function () {
+        let documents = await get_documents({ below_pk: 51 })
 
         assert.equal(documents.length, 50); // sqlite is 1-indexed
 
@@ -55,6 +55,38 @@ describe("documents", function () {
             return
         }
         throw new Error("Should not be able to create document twice with different data")
+    })
+
+    it("should have a header with link to next page", async function () {
+        let response = await get_documents_response()
+        let next_link = response.headers.get("link-next")
+        let documents = await response.json()
+        let last_pk = documents[documents.length - 1].pk;
+        let expected_link = `/document?below_pk=${last_pk}`
+
+        assert.equal(next_link, expected_link)
+    })
+
+    it("should not link to next page when last page", async function () {
+        let response = await get_documents_response({ below_pk: 100 })
+        let next_link = response.headers.get("link-next")
+        assert.equal(next_link, null)
+    })
+
+    it("should have a header with link to prev page", async function () {
+        let response = await get_documents_response({ below_pk: 100 })
+        let prev_link = response.headers.get("link-prev")
+        let documents = await response.json()
+        let first_pk = documents[0].pk;
+        let expected_link = `/document?above_pk=${first_pk}`
+
+        assert.equal(prev_link, expected_link)
+    })
+
+    it("should not link to prev page when first page", async function () {
+        let response = await get_documents_response()
+        let prev_link = response.headers.get("link-prev")
+        assert.equal(prev_link, null)
     })
 })
 
@@ -114,10 +146,14 @@ async function create_document_with_id_and_data(id, data="data") {
     return await result.json()
 }
 
-function get_documents({ before_pk } = {}) {
-    let before = before_pk !== undefined
-        ? `?before=${before_pk}`
-        : "";
-    return fetch(BASE_URL + `/document${before}`, { headers: { cookie } })
+function get_documents({ below_pk } = {}) {
+    return get_documents_response({ below_pk })
         .then(r => r.json())
+}
+
+function get_documents_response({ below_pk } = {}) {
+    let below = below_pk !== undefined
+        ? `?below_pk=${below_pk}`
+        : "";
+    return fetch(BASE_URL + `/document${below}`, { headers: { cookie } })
 }

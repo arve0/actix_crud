@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # output: body + status code, read cookies from file
+
+cargo build
+cargo run &
+server=$(jobs -p)
+sleep 1
+
 base=localhost:8080
 
 description=""
@@ -12,6 +18,7 @@ assert () {
     echo "❌ $description"
     echo "Expected:  '$expected'"
     echo "Actually:  '$result'"
+    kill $server
     exit 1
   else
     echo "✅ $description"
@@ -196,3 +203,5 @@ assert
 echo "All curl tests OK, running mocha tests:"
 
 npm -C test test
+
+kill $server

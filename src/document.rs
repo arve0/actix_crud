@@ -51,14 +51,28 @@ fn get_all(
     login: AuthorizedUser,
     pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
-    let before = parameters.get("before").unwrap_or(&i64::max_value());
+    let below_pk = parameters.get("below_pk").unwrap_or(&i64::max_value());
     let db = pool.get()?;
-    let entries = Document::get_all_before(*before, &login, db).map_err(|err| match err {
+    let entries = Document::get_all_below_pk(*below_pk, &login, &db).map_err(|err| match err {
         SqliteError::QueryReturnedNoRows => ErrorNotFound("not found"),
         err => ErrorInternalServerError(err),
     })?;
 
-    Ok(HttpResponse::Ok().json(entries))
+    let mut response = HttpResponse::Ok();
+
+    if let Some(last) = entries.last() {
+        if Document::count_below(last.pk, &login, &db) > 0 {
+            response.set_header("Link-Next", format!("/document?below_pk={}", last.pk));
+        }
+    }
+
+    if let Some(first) = entries.first() {
+        if Document::count_above(first.pk, &login, &db) > 0 {
+            response.set_header("Link-Prev", format!("/document?above_pk={}", first.pk));
+        }
+    }
+
+    Ok(response.json(entries))
 }
 
 fn get(
@@ -126,7 +140,6 @@ fn insert_idempotent(
     }
 }
 
-
 fn delete(
     id: web::Path<String>,
     login: AuthorizedUser,
@@ -162,7 +175,12 @@ impl Document {
         Self::insert_with_id(id, data, login, db)
     }
 
-    pub fn insert_with_id(id: String, data: JSON, login: &AuthorizedUser, db: PooledConnection) -> DBResult<Document> {
+    pub fn insert_with_id(
+        id: String,
+        data: JSON,
+        login: &AuthorizedUser,
+        db: PooledConnection,
+    ) -> DBResult<Document> {
         let created = Utc::now().timestamp();
 
         let pk = db
@@ -198,10 +216,10 @@ impl Document {
         })
     }
 
-    pub fn get_all_before(
-        before: i64,
+    pub fn get_all_below_pk(
+        below_pk: i64,
         login: &AuthorizedUser,
-        db: PooledConnection,
+        db: &PooledConnection,
     ) -> DBResult<Vec<Document>> {
         db.prepare_cached(
             "select pk, id, created, data from document
@@ -210,7 +228,7 @@ impl Document {
         )?
         .query_map_named(
             named_params! {
-                ":pk": before,
+                ":pk": below_pk,
                 ":username": login.username,
             },
             Document::from_row,
@@ -218,7 +236,43 @@ impl Document {
         .collect()
     }
 
-    pub fn get_by_id(id: &str, login: &AuthorizedUser, db: &PooledConnection) -> DBResult<Document> {
+    pub fn count_below(pk: i64, login: &AuthorizedUser, db: &PooledConnection) -> i64 {
+        db.prepare_cached(
+            "select count(*) from document
+            where pk < :pk and username = :username",
+        )
+        .expect("Unable to create prepared statement.")
+        .query_row_named(
+            named_params! {
+                ":pk": pk,
+                ":username": login.username,
+            },
+            |r| r.get(0),
+        )
+        .unwrap()
+    }
+
+    pub fn count_above(pk: i64, login: &AuthorizedUser, db: &PooledConnection) -> i64 {
+        db.prepare_cached(
+            "select count(*) from document
+            where pk > :pk and username = :username",
+        )
+        .expect("Unable to create prepared statement.")
+        .query_row_named(
+            named_params! {
+                ":pk": pk,
+                ":username": login.username,
+            },
+            |r| r.get(0),
+        )
+        .unwrap()
+    }
+
+    pub fn get_by_id(
+        id: &str,
+        login: &AuthorizedUser,
+        db: &PooledConnection,
+    ) -> DBResult<Document> {
         db.prepare_cached(
             "select pk, id, created, data from document
             where id=:id and username=:username",
