@@ -3,7 +3,7 @@
     "test": "./reset-db && mocha"
   },
   "dependencies": {
-    "mocha": "^6.2.1",
+    "mocha": "^10.2.0",
     "node-fetch": "^2.6.1"
   }
 }
